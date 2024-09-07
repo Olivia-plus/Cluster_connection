@@ -171,7 +171,7 @@ bigMatrix = (bigMatrix + bigMatrix')/2;
 e = complementarity(net_load,num_buildings);
 roh1 = modularity(relationshipMatrix,bigMatrix,e);
 
-    %% 适应度
+    %% 适应度 
     fitness = sum(fitness_prob(:))/20000000-roh1;
     trade_power=sum(best_trade_volume_total_prob(:));
 end
