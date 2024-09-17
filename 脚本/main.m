@@ -3,8 +3,8 @@
 % 版本: v1.0
 % 作者: Wuaoli-123
 % 联系方式: 2713337051@qq.com
-% 日期: 2024-05-25
-% 描述: 
+% 日期: 2024-09-08
+% 描述:适应度函数由成本和收益两个指标构成。收益由集群整体构成的新增光伏消纳量决定，成本由线路铺设投资成本决定。去掉模块度，同时在集群划分的过程中，将储能和可平移负荷的综合优化融合到目标函数最优化的求解中去。
 % 输入:  
 % 输出:  
 %**************************************************************************
@@ -78,22 +78,22 @@ disp(building_info);
 max_iter = 50; % 最大迭代次数
 pop_size = 100; % 种群规模
 dim=num_buildings; % 粒子维度
-ub=num_buildings; %集群划分个数上限
-lb=1; %集群划分个数下限
+% ub=num_buildings; %集群划分个数上限
+% lb=1; %集群划分个数下限
 vmax = 4; % 最大飞行速度
 max_num_cluster =ceil(num_buildings/2); % 最大集群划分数量为建筑的总个数/2，ceil向上取整
 w = 0.8; % 惯性权重
 c1 = 1.5; % 学习因子 1
 c2 = 1.5; % 学习因子 2        
-electricity_price=0.9*1000;% 建筑交易收益电价0.9元/度，恒定不变
-dc_cost_p=208;% 线路铺设成本208元/米【需要更改】
+electricity_price=0.45;% 建筑交易收益电价0.45元/度，恒定不变
+dc_cost_p=208;% 线路铺设成本208元/米【折旧到每一天】
 
 net_load{num_buildings}=0;
     for i = 1:num_buildings
     net_load{i} = load_curve{i} - pv_curve{i};% 净负荷曲线
     end
 % 初始化种群
-particles = zeros(pop_size, dim); % 初始化种群的位置 每行代表一个粒子，每列代表一个建筑，值表示所属集群编号 100行n列
+particles = zeros(pop_size, dim); % 初始化种群的位置 每行代表一个粒子集群划分情况，每列代表一个建筑，值表示所属集群编号 100行n列
 velocity=zeros(pop_size, dim);
 % 初始化每个历史最优粒子
 pbest_fitness = Inf(pop_size, 1); % 个体历史最优适应度值  总成本最低
@@ -146,7 +146,7 @@ best_connectMatrix=zeros(num_buildings,num_buildings);% 最佳连接矩阵
                             pbest_fitness(j,1) = fitness_valuse_personal(j,1);
                         end
                         % 更新全局最优
-                        if pbest_fitness(j,1) < gbest_fitness% 粒子和过去对比
+                        if pbest_fitness(j,1) < gbest_fitness% 粒子和全局最优解对比
                             gbest = pbest(j,:);
                             gbest_fitness = pbest_fitness(j,1);
                             trade=trade_power(j,1);

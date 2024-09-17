@@ -6,6 +6,7 @@ function [fitness,trade_power,bigMatrix] = calculate_fitness(cluster_solution, n
     % 假设 max_cluster 是集群的最大编号
     % 初始化元胞数组
     max_cluster=max(cluster_solution);
+    2 2 3 4 5 7 2 7 8 8
     % 初始化元胞数组
     cluster_info = cell(1, max_cluster);
     % 遍历每个集群
@@ -101,13 +102,14 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
             %             end
             %         end
             %    
+            
                     %% 计算电能交易量和直流线路铺设成本,这是对一个集群的，当然要遍历所有的集群【还没有遍历，已完成】这里的num——buildings需要修改为划分集群后的建筑的数量，需要重新编号
                     trade_volume_total = 0;%总交易电量
                     trade_volume=zeros(1,48);%实时交易电量，临时的变量
                     dc_cost_total=0;
                     for i = 1:m
                         for j = 1:m
-                            if current_matrix(i, j) == 1 % 如果两个建筑互联了
+                            if current_matrix(i, j) == 1 % 如果两个建筑互联了【TODO：不需要这么复杂了，只需要考虑整体的建筑的交易即可，考虑跨建筑电量交易情况】
                                 dc_cost_total=dc_cost_total+current_matrix(i, j)*dc_cost_p*sqrt((x(cluster_info{c}(i))-x(cluster_info{c}(j)))^2+(y(cluster_info{c}(i))-y(cluster_info{c}(j)))^2); % 直流线路铺设成本
                                 for k=1:48
                                     if (net_load{cluster_info{c}(i)}(k) < 0 && net_load{cluster_info{c}(j)}(k) >0)||(net_load{cluster_info{c}(i)}(k) > 0 && net_load{cluster_info{c}(j)}(k) <0) % 如果建筑 i,j曲线互补
@@ -169,9 +171,9 @@ end
 bigMatrix = (bigMatrix + bigMatrix')/2;
 
 e = complementarity(net_load,num_buildings);
-roh1 = modularity(relationshipMatrix,bigMatrix,e);
+% roh1 = modularity(relationshipMatrix,bigMatrix,e);
 
-    %% 适应度 
-    fitness = sum(fitness_prob(:))/20000000-roh1;
+    %% 适应度 收益减去成本
+    fitness = sum(fitness_prob(:));
     trade_power=sum(best_trade_volume_total_prob(:));
 end

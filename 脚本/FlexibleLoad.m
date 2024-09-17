@@ -162,32 +162,37 @@
 % disp(discharge)
 
 
-%% 添加24小时
-%% 说明：建筑的数量是变量，时间分段暂时设置的是24小时，需要改成48小时，随机生成的实例数据需要根据自己设计的参数进行改变，储能的参数，需要根据现有的相关论文进行设计，建筑互联矩阵这个也得更改
-% 参数设置
-m = 5; % 建筑数量
-T = 24; % 时间分段（24小时）
+%% 计算收益 
+%% 说明：建筑的数量是变量，时间分段暂时设置的是24小时，需要改成48小时，随机生成的实例数据需要根据自己设计的参数进行改变，
+% 储能的参数，需要根据现有的相关论文进行设计，建筑互联矩阵这个也得更改
+% 最后这个脚本要变成函数，参与适应度函数的计算
+% function[光伏消纳量,]=FlexibleLoad(Build_num,net_load,...)
+% 参数设置 传入的是建筑的各种信息，对应编号的信息，日光伏和日净负荷曲线，可转移负荷，可平移负荷和电动汽车之类的东西，不需要互联的信息了，很好
+m = 5; % 建筑数量【待传入】
+T = 24; % 时间分段（24小时48个点）
 
-% 随机生成示例数据
-PV_generation = rand(m, T) * 100;  % 每个建筑在每个时段的PV发电量
-load_demand = rand(m, T) * 80;     % 每个建筑在每个时段的电力需求
-flexible_load = rand(m, 1) * 30;   % 每个建筑的柔性负荷（可平移的负荷总量）
-ev_load = rand(m, 1) * 20;         % 每个建筑的电动汽车负荷（总量）
-line_capacity = rand(m, m) * 50;   % 建筑之间线路容量
+% 随机生成示例数据，根据建筑实际的容量配置【待传入】【可平移、可转移】
+PV_generation = rand(m, T) * 100*40;  % 每个建筑在每个时段的PV发电量
+load_demand = rand(m, T) * 80*40;     % 每个建筑在每个时段的电力需求
+flexible_load = rand(m, 1) * 30*40;   % 每个建筑的柔性负荷（可转移的负荷总量）【TODO：每个建筑设有自己的柔性负荷 1/3】
+ ev_load = rand(m, 1) * 20*40;         % 每个建筑的电动汽车负荷（总量）
+% line_capacity =ones(m,m)* 0.75*1000*135;   % 建筑之间线路容量101.25KW【由老师发的资料数据所得】
+% line_capacity = ones(m, m) * 101.25;% 线路容量，每条线还不一样？怪异【暂时不考虑】
+
 
 % 储能系统参数
-storage_capacity = rand(m, 1) * 50; % 每个建筑的储能容量
-initial_soc = storage_capacity / 2; % 初始储能状态 (设置为容量的一半)
-charge_rate = rand(m, 1) * 10;      % 储能充电速率
-discharge_rate = rand(m, 1) * 10;   % 储能放电速率
+storage_capacity = rand(m, 1) * 50*20; % 每个建筑的储能容量
+initial_soc = storage_capacity *0.2; % 初始储能状态 (设置为容量的一半)
+charge_rate = rand(m, 1) * 90;      % 储能充电速率
+discharge_rate = rand(m, 1) * 90;   % 储能放电速率
 
-% 互联矩阵，1表示建筑之间相互连接，0表示不连接
-adjacency_matrix = [1 1 1 0 1;
-                    1 1 1 0 0;
-                    1 1 1 1 0;
-                    0 0 1 1 1;
-                    1 0 0 1 1];
-
+% 互联矩阵，1表示建筑之间相互连接，0表示不连接【不需要了】
+adjacency_matrix = [1 1 1 1 1;
+                    1 1 1 1 1;
+                    1 1 1 1 1;
+                    1 1 1 1 1;
+                    1 1 1 1 1];
+ 
 % 优化变量
 cvx_begin
     variable transfer(m, m, T) % 每个时段建筑之间的能量传输
@@ -215,13 +220,13 @@ cvx_begin
         % 线路容量限制
         for i = 1:m
             for j = 1:m
-                if adjacency_matrix(i, j) == 0
-                    transfer(i, j, :) == 0; % 没有连接的建筑间无法进行能量交易
-                else
+%                 if adjacency_matrix(i, j) == 0
+%                     transfer(i, j, :) == 0; % 没有连接的建筑间无法进行能量交易【现在可以进行交易了】
+%                 else
                     for t = 1:T
-                        transfer(i, j, t) <= line_capacity(i, j); % 受线路容量限制
+                        transfer(i, j, t) <= line_capacity(i, j); % 受线路容量限制 其实不是很受限制才对
                     end
-                end
+%                 end
             end
         end
         
@@ -256,7 +261,7 @@ cvx_begin
             soc(i, T) == initial_soc(i); % 最终状态等于初始状态
         end
         
-%         % 回馈电网的能量不能为负值
+%         % 回馈电网的能量不能为负值 【可以为负，为负的部分就是从电网取电的过程，当光伏不能满足负荷要求的时候，就会向电网取电】
 %         grid_feed >= 0;
 
 cvx_end
