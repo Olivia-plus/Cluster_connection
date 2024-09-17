@@ -6,7 +6,6 @@ function [fitness,trade_power,bigMatrix] = calculate_fitness(cluster_solution, n
     % 假设 max_cluster 是集群的最大编号
     % 初始化元胞数组
     max_cluster=max(cluster_solution);
-    2 2 3 4 5 7 2 7 8 8
     % 初始化元胞数组
     cluster_info = cell(1, max_cluster);
     % 遍历每个集群
@@ -102,7 +101,7 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
             %             end
             %         end
             %    
-            
+
                     %% 计算电能交易量和直流线路铺设成本,这是对一个集群的，当然要遍历所有的集群【还没有遍历，已完成】这里的num——buildings需要修改为划分集群后的建筑的数量，需要重新编号
                     trade_volume_total = 0;%总交易电量
                     trade_volume=zeros(1,48);%实时交易电量，临时的变量

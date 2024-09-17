@@ -1,8 +1,8 @@
 % 随机生成建筑信息 保证建筑的类型固定，但是建筑的曲线的规模随机【二次验证的时候需要固定一下参数】
-function [x, y, type,load_curve,pv_curve] = GenerateBuildingInfo(n)
+function [x, y, type,load_curve,pv_curve,flexible_load] = GenerateBuildingInfo(n)
     % 随机生成建筑位置
-    x = rand(1, n) * 700; % 假设建筑在 700×700 ㎡ 的面积里面随机分布，【TODO：范围改大一点】
-    y = rand(1, n) * 700;
+    x = rand(1, n) * 7000; % 假设建筑在 7000×7000 ㎡ 的面积里面随机分布，【TODO：范围改大一点】
+    y = rand(1, n) * 7000;
     
     % 随机生成建筑类型
     building_types = {'住宅建筑', '办公建筑', '工业园区', '文化建筑', '商业建筑'};
@@ -10,11 +10,12 @@ function [x, y, type,load_curve,pv_curve] = GenerateBuildingInfo(n)
     type = building_types(type_indices);
 
     % 确保建筑之间有一定的距离
-    min_distance = 95; % 假设最小距离为 95 米
+    min_distance = 200; % 假设最小距离为 95 米
     for i = 2:n
         while min(sqrt((x(i)-x(1:i-1)).^2 + (y(i)-y(1:i-1)).^2)) < min_distance
-            x(i) = rand * 700;
-            y(i) = rand * 700;
+            x(i) = rand * 7000;
+            y(i) = rand * 7000;
+        end
     end
     % 日负荷曲线和日光伏曲线数据
 residential_load_curve = [
@@ -85,7 +86,7 @@ commercial_pv_curve =[0,0,0,0,0,0,0,0,0,0,0,0,14.22036,24.767127,37.683954,53.08
  % 初始化负载和光伏曲线
     load_curve = cell(1, n);
     pv_curve = cell(1, n);
-
+    flexible_load =zeros(1,n);
 % 根据建筑类型分配对应的曲线数据
   rng(1); % 设置随机种子以便结果可重复
   for j = 1:n
@@ -93,18 +94,23 @@ commercial_pv_curve =[0,0,0,0,0,0,0,0,0,0,0,0,14.22036,24.767127,37.683954,53.08
             case '住宅建筑'
                 load_curve{j} =(0.5+rand())*residential_load_curve;
                 pv_curve{j} = (0.5+rand())*residential_pv_curve;
+                flexible_load{j}=(0.5+rand())*sum(residential_load_curve)*1/3;
             case '办公建筑'
                 load_curve{j} = (0.5+rand())*office_load_curve;
                 pv_curve{j} = (0.5+rand())*office_pv_curve;
+                flexible_load{j}=(0.5+rand())*sum(office_load_curve)*1/3;
             case '工业园区'
                 load_curve{j} = (0.5+rand())*industrial_load_curve;
                 pv_curve{j} = (0.5+rand())*industrial_pv_curve;
+                flexible_load{j}=(0.5+rand())*sum(industrial_load_curve)*1/3;
             case '文化建筑'
                 load_curve{j} =(0.5+rand())* cultural_load_curve;
                 pv_curve{j} = (0.5+rand())*cultural_pv_curve;
+                flexible_load{j}=(0.5+rand())*sum(cultural_load_curve)*1/3;
             case '商业建筑'
                 load_curve{j} =(0.5+rand())* commercial_load_curve;
                 pv_curve{j} =(0.5+rand())* commercial_pv_curve;
+                flexible_load{j}=(0.5+rand())*sum(commercial_load_curve)*1/3;
             otherwise
                 error('Invalid building type');
         end
