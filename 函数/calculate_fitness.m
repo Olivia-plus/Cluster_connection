@@ -53,6 +53,7 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
     best_trade_volume_total_prob=zeros(num_clusters,1);
     fitness_connect=inf;
     %% 遍历每一个集群
+    T=48;
     for c=1:num_clusters
         % 对进行柔性负荷调度函数传入的参数进行集群化处理
         m=length(cluster_info{c});% 矩阵的大小，建筑的数量
@@ -69,7 +70,8 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
         % 柔性负荷调度
         PV_digest=FlexibleLoad(m,net_load_cluster_array,flexible_load,storage_capacity);
     %% 循环遍历一个集群所有可能的连接情况【这里的m可能需要修改成为对应的集群中矩阵的尺寸,已修改】
-        total_matrices=2^(m*(m-1)/2);% 总可能的矩阵数量
+        % 【TODO：最小生成树算法】
+       total_matrices=2^(m*(m-1)/2);% 总可能的矩阵数量
         current_matrix=zeros(m,m);
         best_matrix =zeros(m,m);
         if m == 0 

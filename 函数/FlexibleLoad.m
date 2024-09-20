@@ -166,7 +166,7 @@
 %% 说明：针对一个集群而言，故建筑的数量是变量，还需要知道建筑的编号
 % 储能的参数，需要根据现有的相关论文进行设计，建筑互联矩阵这个也得更改【无关互联矩阵】
 % 加入线路容量 市场电缆的粗细，成本 量化方法，成本代替路径作为线路权重 分档次，土建的成本
- function[y]=FlexibleLoad(Build_num,net_load_cluster,flexible_load,storage_capacity)
+ function[y]=FlexibleLoad(Build_num,net_load_cluster,flexible_load,storage_capacity)% 【TODO：不传入净负荷，改成光伏和负荷】
 % 参数设置 传入的是建筑的各种信息，对应编号的信息，日光伏和日净负荷曲线，可转移负荷，可平移负荷和电动汽车之类的东西，不需要互联的信息了，很好
 m = Build_num; % 建筑数量【待传入】
  T = 48; % 时间分段（24小时48个点）
@@ -177,13 +177,13 @@ m = Build_num; % 建筑数量【待传入】
 % flexible_load = rand(m, 1) * 30*40;   % 每个建筑的柔性负荷（可转移的负荷总量）【TODO：每个建筑设有自己的柔性负荷 1/3】
  ev_load = rand(m, 1) * 20*40*0;         % 每个建筑的电动汽车负荷（总量）
 % line_capacity =ones(m,m)* 0.75*1000*135;   % 建筑之间线路容量101.25KW【由老师发的资料数据所得】
-% line_capacity = ones(m, m) * 101.25; % 线路容量，每条线还不一样？怪异【暂时不考虑】
+ line_capacity = ones(m, m) * 101.25; % 线路容量，每条线还不一样？怪异【暂时不考虑】
 
 
 % 储能系统参数
 % storage_capacity = rand(m, 1) * 50*20; % 每个建筑的储能容量
 initial_soc = storage_capacity *0.2; % 初始储能状态 (设置为容量的一半)
-charge_rate = rand(m, 1) * 90;      % 储能充电速率
+charge_rate = rand(m, 1) * 90;      % 储能充电速率【TODO：是否合理？一般储能电池容量和充放电速度之间的关系】
 discharge_rate = rand(m, 1) * 90;   % 储能放电速率
 
 % % 互联矩阵，1表示建筑之间相互连接，0表示不连接【不需要了】
@@ -198,13 +198,14 @@ cvx_begin
     variable transfer(m, m, T) % 每个时段建筑之间的能量传输
     variable flex_dispatch(m, T) % 每个时段柔性负荷调度
     variable ev_dispatch(m, T) % 每个时段电动汽车负荷调度
-    variable grid_feed(m, T) % 每个时段回馈给电网的能量
+    variable grid_feed(m, T) % 每个时段电网的能量【有正有负】
     variable soc(m, T) % 储能系统的状态 (State of Charge)
     variable charge(m, T) % 每个时段储能充电
     variable discharge(m, T) % 每个时段储能放电
     
     % 目标函数：最大化光伏消纳率
-    y=sum(sum(PV_generation - grid_feed));
+%     y=sum(sum((net_load_cluster>0)- grid_feed));【所有光伏量-未被消纳的（grid_feed<0）】
+    y=sum(sum(net_load_cluster>0)- sum(grid_feed>0));% 【逻辑有误】
     maximize(y)
     
     % 约束条件
@@ -233,8 +234,8 @@ cvx_begin
         
         % 柔性负荷与电动汽车负荷调度限制
         for i = 1:m
-            sum(flex_dispatch(i, :)) <= flexible_load(i); % 柔性负荷调度总量限制
-            sum(ev_dispatch(i, :)) <= ev_load(i); % 电动汽车负荷调度总量限制
+            sum(flex_dispatch(i, :)) = flexible_load(i); % 柔性负荷调度总量限制
+            sum(ev_dispatch(i, :)) = ev_load(i); % 电动汽车负荷调度总量限制
             flex_dispatch(i, :) >= 0;
             ev_dispatch(i, :) >= 0;
         end
@@ -302,7 +303,7 @@ for i = 1:m
     xlabel('时间 (小时)');
     ylabel('能量 (kWh)');
     legend({'建筑间传输', '储能放电', '储能充电', '与电网交互'}, 'Location', 'best');
-    ylim([-max(max(max(transfer))) max(max(max(transfer)))]); % 设置y轴范围
+%     ylim([-max(max(max(transfer))) max(max(max(transfer)))]); % 设置y轴范围
 end
 
 % 设置整个图形的标题
