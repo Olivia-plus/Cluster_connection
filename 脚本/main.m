@@ -17,7 +17,7 @@ tic
 num_buildings = 20;
 % 随机生成建筑横、纵坐标；建筑类型；负荷和光伏曲线分配
 % 建筑类型确定，负荷和光伏的曲线也就确定了【待优化】
-[x, y, type, load_curve, pv_curve] = GenerateBuildingInfo(num_buildings);
+[x, y, type, load_curve, pv_curve,flexible_load_main,storage_capacity_main] = GenerateBuildingInfo(num_buildings);
 % 绘制建筑位置分布图
 PlotBuildingLocations(x, y,type);
 % 显示每个建筑的位置和类型, '行列转换符,列转行
@@ -109,7 +109,7 @@ for i = 1:pop_size
 %             % 如果没有建筑，重新生成一个随机解
 %             particles(i, :) = randi(p, 1, num_buildings);
 %             end
-    [pbest_fitness(i,1),trade_power_1(i,1),]=calculate_fitness(particles(i, :),net_load, electricity_price, dc_cost_p,x,y,num_buildings);
+    [pbest_fitness(i,1),trade_power_1(i,1),]=calculate_fitness(particles(i, :),net_load, electricity_price, dc_cost_p,x,y,num_buildings,flexible_load_main,storage_capacity_main);
 end
 pbest = particles; % 所有粒子个体最优位置  
 % 初始化全局历史最优粒子 
@@ -139,7 +139,7 @@ best_connectMatrix=zeros(num_buildings,num_buildings);% 最佳连接矩阵
                     % 做一个小的判断，只有满足划分要求的粒子才能进行适应度的计算
                    if num_mode_max < 8 && num_mode_min > 1
                         % 计算当前粒子的适应度值
-                        [fitness_valuse_personal(j,1),trade_power(j,1),bigMatrix]= calculate_fitness(particles(j, :), net_load, electricity_price, dc_cost_p,x,y,num_buildings); 
+                        [fitness_valuse_personal(j,1),trade_power(j,1),bigMatrix]= calculate_fitness(particles(j, :), net_load, electricity_price, dc_cost_p,x,y,num_buildings,flexible_load_main,storage_capacity_main); 
                         % 更新个体最优
                         if fitness_valuse_personal(j,1) < pbest_fitness(j,1)
                             pbest(j,:) = particles(j, :);

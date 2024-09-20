@@ -1,6 +1,6 @@
 % 计算适应度和更新速度和位置的函数
-function [fitness,trade_power,bigMatrix] = calculate_fitness(cluster_solution, net_load, electricity_price, dc_cost_p,x,y,num_buildings)
-    %% 处理集群的分类结果，得到每个集群的基本情况 传入[集群划分结果，净负荷，电价，直流线路铺设成本，坐标x,y]
+function [fitness,trade_power,bigMatrix] = calculate_fitness(cluster_solution, net_load, electricity_price, dc_cost_p,x,y,num_buildings,flexible_load_main,storage_capacity_main)
+    %% 处理集群的分类结果，得到每个集群的基本情况 传入[集群划分结果，净负荷，电价，直流线路铺设成本，坐标x,y,建筑的数量，柔性负荷，储能的容量]
     %% 创建一个元胞数组来装集群的分类情况，以此来寻找对应的建筑
     % 假设 clusters 是一个行向量，每个元素表示对应建筑所属的集群编号
     % 假设 max_cluster 是集群的最大编号
@@ -8,18 +8,17 @@ function [fitness,trade_power,bigMatrix] = calculate_fitness(cluster_solution, n
     max_cluster=max(cluster_solution);
     % 初始化元胞数组
     cluster_info = cell(1, max_cluster);
-    % 遍历每个集群
+    % 遍历每个集群，整理集群并放在cluster_info元胞矩阵里面
     for cluster_id = 1:max_cluster
         % 找到属于当前集群的粒子的索引,并形成一个新的数组
        indices =find(cluster_solution == cluster_id); %【如何将属于同一集群的建筑编号归到一个数组中去】
         % 将该数组添加到元胞数组中
         cluster_info{cluster_id} =indices;
     end
-
 %     % 假设建筑总数为m，集群数为n
 % m = 5; % 例如有5个建筑
 % n = 2; % 例如有2个集群
-% 
+
 % % 定义每个集群，集群内部建筑的编号
 % C{1} = [1, 2, 3]; % 集群1 包含建筑 1, 2, 3
 % C{2} = [4, 5];    % 集群2 包含建筑 4, 5
@@ -55,8 +54,21 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
     fitness_connect=inf;
     %% 遍历每一个集群
     for c=1:num_clusters
-        %% 循环遍历一个集群所有可能的连接情况【这里的m可能需要修改成为对应的集群中矩阵的尺寸,已修改】
-        m=length(cluster_info{c});% 矩阵的大小 
+        % 对进行柔性负荷调度函数传入的参数进行集群化处理
+        m=length(cluster_info{c});% 矩阵的大小，建筑的数量
+        flexible_load=zeros(m,1);
+        storage_capacity=zeros(m,1);
+        net_load_cluster=cell(1,m);
+        net_load_cluster_array=zeros(m,T);
+        for q=1:m
+            flexible_load(q)=flexible_load_main(cluster_info{c}(q));
+            storage_capacity(q)=storage_capacity_main(cluster_info{c}(q));
+            net_load_cluster{q}=net_load{cluster_info{c}(q)};
+            net_load_cluster_array=cell2mat(net_load_cluster');
+        end
+        % 柔性负荷调度
+        PV_digest=FlexibleLoad(m,net_load_cluster_array,flexible_load,storage_capacity);
+    %% 循环遍历一个集群所有可能的连接情况【这里的m可能需要修改成为对应的集群中矩阵的尺寸,已修改】
         total_matrices=2^(m*(m-1)/2);% 总可能的矩阵数量
         current_matrix=zeros(m,m);
         best_matrix =zeros(m,m);
@@ -110,21 +122,22 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
                         for j = 1:m
                             if current_matrix(i, j) == 1 % 如果两个建筑互联了【TODO：不需要这么复杂了，只需要考虑整体的建筑的交易即可，考虑跨建筑电量交易情况】
                                 dc_cost_total=dc_cost_total+current_matrix(i, j)*dc_cost_p*sqrt((x(cluster_info{c}(i))-x(cluster_info{c}(j)))^2+(y(cluster_info{c}(i))-y(cluster_info{c}(j)))^2); % 直流线路铺设成本
-                                for k=1:48
-                                    if (net_load{cluster_info{c}(i)}(k) < 0 && net_load{cluster_info{c}(j)}(k) >0)||(net_load{cluster_info{c}(i)}(k) > 0 && net_load{cluster_info{c}(j)}(k) <0) % 如果建筑 i,j曲线互补
-                                        trade_volume(k) = min(abs(net_load{cluster_info{c}(i)}(k)),abs(net_load{cluster_info{c}(j)}(k))); % 建筑 i 与建筑 j在k时刻交易的电量
-                                        % 更新建筑交易之后的净负荷曲线
-                                        net_load{i}(k)=net_load{cluster_info{c}(i)}(k)-sign(net_load{cluster_info{c}(i)}(k))*trade_volume(k);
-                                        net_load{j}(k)=net_load{cluster_info{c}(j)}(k)-sign(net_load{cluster_info{c}(j)}(k))*trade_volume(k);
-                                        trade_volume_total=trade_volume_total+trade_volume(k);
-                                    end
-                                end
+%                                 for k=1:48
+%                                     if (net_load{cluster_info{c}(i)}(k) < 0 && net_load{cluster_info{c}(j)}(k) >0)||(net_load{cluster_info{c}(i)}(k) > 0 && net_load{cluster_info{c}(j)}(k) <0) % 如果建筑 i,j曲线互补
+%                                         trade_volume(k) = min(abs(net_load{cluster_info{c}(i)}(k)),abs(net_load{cluster_info{c}(j)}(k))); % 建筑 i 与建筑 j在k时刻交易的电量
+%                                         % 更新建筑交易之后的净负荷曲线
+%                                         net_load{i}(k)=net_load{cluster_info{c}(i)}(k)-sign(net_load{cluster_info{c}(i)}(k))*trade_volume(k);
+%                                         net_load{j}(k)=net_load{cluster_info{c}(j)}(k)-sign(net_load{cluster_info{c}(j)}(k))*trade_volume(k);
+%                                         trade_volume_total=trade_volume_total+trade_volume(k);
+%                                     end
+%                                 end
                             end
                         end
                     end
-                    trade_cost_total = trade_volume_total *electricity_price; % 计算交易电量收益 售电方的收益和购电方节省的电量
+%                     trade_cost_total = trade_volume_total *electricity_price; % 计算交易电量收益 售电方的收益和购电方节省的电量
                     % 计算适应度 目标函数
-                    total_cost =dc_cost_total - trade_cost_total; % 总成本为直流线路成本减去交易收入
+%                     total_cost =dc_cost_total - trade_cost_total; % 总成本为直流线路成本减去交易收入
+                     total_cost =dc_cost_total; % 总成本为直流线路成本减去交易收入
                     %加入一个判断
                     if total_cost < fitness_connect
                         fitness_connect = total_cost;
@@ -169,10 +182,10 @@ end
 % 确保矩阵对称
 bigMatrix = (bigMatrix + bigMatrix')/2;
 
-e = complementarity(net_load,num_buildings);
+% e = complementarity(net_load,num_buildings);
 % roh1 = modularity(relationshipMatrix,bigMatrix,e);
 
     %% 适应度 收益减去成本
-    fitness = sum(fitness_prob(:));
-    trade_power=sum(best_trade_volume_total_prob(:));
+    fitness = -(PV_digest*electricity_price-total_cost);
+    trade_power=PV_digest;
 end
