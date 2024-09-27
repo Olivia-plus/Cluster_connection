@@ -166,7 +166,7 @@
 %% 说明：针对一个集群而言，故建筑的数量是变量，还需要知道建筑的编号
 % 储能的参数，需要根据现有的相关论文进行设计，建筑互联矩阵这个也得更改【无关互联矩阵】
 % 加入线路容量 市场电缆的粗细，成本 量化方法，成本代替路径作为线路权重 分档次，土建的成本
- function[y]=FlexibleLoad(Build_num,net_load_cluster,flexible_load,storage_capacity)% 【TODO：不传入净负荷，改成光伏和负荷】
+function[y,P_transMax_array]=FlexibleLoad(Build_num,load_curve_cluster,pv_curve_cluster,flexible_load,storage_capacity)% 【TODO：不传入净负荷，改成光伏和负荷,已改】
 % 参数设置 传入的是建筑的各种信息，对应编号的信息，日光伏和日净负荷曲线，可转移负荷，可平移负荷和电动汽车之类的东西，不需要互联的信息了，很好
 m = Build_num; % 建筑数量【待传入】
  T = 48; % 时间分段（24小时48个点）
@@ -178,14 +178,13 @@ m = Build_num; % 建筑数量【待传入】
  ev_load = rand(m, 1) * 20*40*0;         % 每个建筑的电动汽车负荷（总量）
 % line_capacity =ones(m,m)* 0.75*1000*135;   % 建筑之间线路容量101.25KW【由老师发的资料数据所得】
  line_capacity = ones(m, m) * 101.25; % 线路容量，每条线还不一样？怪异【暂时不考虑】
-
-
+P_transMax_array = zeros(m,m);
+% https://www.bilibili.com/read/cv33635168/
 % 储能系统参数
-% storage_capacity = rand(m, 1) * 50*20; % 每个建筑的储能容量
 initial_soc = storage_capacity *0.2; % 初始储能状态 (设置为容量的一半)
-charge_rate = rand(m, 1) * 90;      % 储能充电速率【TODO：是否合理？一般储能电池容量和充放电速度之间的关系】
-discharge_rate = rand(m, 1) * 90;   % 储能放电速率
-
+charge_rate = ones(m, 1) * 0.125;      % 储能充电速率【TODO：是否合理？一般储能电池容量和充放电速度之间的关系。0.25C用于调峰，48点，还要额外除以2。已完成】
+% discharge_rate = rand(m, 1) * 0.125;   % 储能放电速率
+discharge_rate = ones(m, 1) * 0.125;   % 储能放电速率
 % % 互联矩阵，1表示建筑之间相互连接，0表示不连接【不需要了】
 % adjacency_matrix = [1 1 1 1 1;
 %                     1 1 1 1 1;
@@ -205,7 +204,7 @@ cvx_begin
     
     % 目标函数：最大化光伏消纳率
 %     y=sum(sum((net_load_cluster>0)- grid_feed));【所有光伏量-未被消纳的（grid_feed<0）】
-    y=sum(sum(net_load_cluster>0)- sum(grid_feed>0));% 【逻辑有误】
+    y=sum(pv_curve_cluster-load_curve_cluster>0)-sum(grid_feed>0);% 【逻辑有误,已修正】
     maximize(y)
     
     % 约束条件
@@ -214,8 +213,8 @@ cvx_begin
         for i = 1:m
             for t = 1:T
                 % 能量平衡：PV发电 + 接收能量 + 放电 = 需求 + 柔性负荷 + 电动汽车负荷 + 回馈电网的能量 + 传出能量 + 充电
-              net_load_cluster+ sum(transfer(:, i, t)) + discharge(i, t) + flex_dispatch(i, t) + ev_dispatch(i, t) ...
-                    == grid_feed(i, t) + sum(transfer(i, :, t)) + charge(i, t);
+              pv_curve_cluster{i}(t)+ sum(transfer(:, i, t)) + discharge(i, t)*storage_capacity(m)+ flex_dispatch(i, t) + ev_dispatch(i, t) ...
+                    == grid_feed(i, t) + sum(transfer(i, :, t)) + charge(i, t)*storage_capacity(m)+load_curve_cluster{i}(t);
             end
         end
         
@@ -228,6 +227,7 @@ cvx_begin
                     for t = 1:T
                         transfer(i, j, t) <= line_capacity(i, j); % 受线路容量限制 其实不是很受限制才对
                     end
+                    P_transMax_array(i,j)= sum(transfer(i, j, :));
 %                 end
             end
         end
@@ -256,11 +256,11 @@ cvx_begin
         
         % 储能状态平衡和初始条件
         for i = 1:m
-            soc(i, 1) == initial_soc(i); % 初始状态
+            soc(i, 1) = initial_soc(i); % 初始状态
             for t = 2:T
-                soc(i, t) == soc(i, t-1) + charge(i, t-1) - discharge(i, t-1); % 状态平衡
+                soc(i, t) = soc(i, t-1) + charge(i, t-1)*storage_capacity(i)- discharge(i, t-1)*storage_capacity(i); % 状态平衡
             end
-            soc(i, T) == initial_soc(i); % 最终状态等于初始状态
+            soc(i, T) = initial_soc(i); % 最终状态等于初始状态
         end
         
 %         % 回馈电网的能量不能为负值 【可以为负，为负的部分就是从电网取电的过程，当光伏不能满足负荷要求的时候，就会向电网取电】
@@ -268,44 +268,44 @@ cvx_begin
 
 cvx_end
 
-% 输出结果
-disp('建筑之间的能量传输:')
-disp(transfer)
-disp('柔性负荷调度:')
-disp(flex_dispatch)
-disp('电动汽车负荷调度:')
-disp(ev_dispatch)
-disp('回馈电网的能量:')
-disp(grid_feed)
-disp('储能系统的状态:')
-disp(soc)
-disp('储能充电:')
-disp(charge)
-disp('储能放电:')
-disp(discharge)
+% % 输出结果
+% disp('建筑之间的能量传输:')
+% disp(transfer)
+% disp('柔性负荷调度:')
+% disp(flex_dispatch)
+% disp('电动汽车负荷调度:')
+% disp(ev_dispatch)
+% disp('回馈电网的能量:')
+% disp(grid_feed)
+% disp('储能系统的状态:')
+% disp(soc)
+% disp('储能充电:')
+% disp(charge)
+% disp('储能放电:')
+% disp(discharge)
 
 % 假设已经执行了优化模型，并得到了 transfer, charge, discharge, grid_feed 变量的值
 
 % 设置颜色
-colors = lines(m);
+% colors = lines(m);
 
-% 绘制24小时内每个建筑的能量传输情况
- figure;
-for i = 1:m
-    subplot(m,1,i); % 创建一个m行1列的子图布局
-    bar(1:T, squeeze(sum(transfer(i,:,:), 2)), 'stacked'); % 叠加柱状图表示该建筑与其他建筑的能量传输
-    hold on;
-    bar(1:T, discharge(i,:), 'FaceColor', colors(i,:), 'EdgeColor', 'none'); % 叠加储能放电
-    bar(1:T, -charge(i,:), 'FaceColor', colors(i,:), 'EdgeColor', 'none', 'FaceAlpha', 0.5); % 叠加储能充电
-    bar(1:T, grid_feed(i,:), 'FaceColor', [0 0 0], 'EdgeColor', 'none'); % 叠加与电网的能量交互
-    hold off;
-    title(['建筑 ' num2str(i) ' 的电能交互情况']);
-    xlabel('时间 (小时)');
-    ylabel('能量 (kWh)');
-    legend({'建筑间传输', '储能放电', '储能充电', '与电网交互'}, 'Location', 'best');
-%     ylim([-max(max(max(transfer))) max(max(max(transfer)))]); % 设置y轴范围
-end
-
-% 设置整个图形的标题
-sgtitle('建筑之间的能量交互情况');
+% % 绘制24小时内每个建筑的能量传输情况
+%  figure;
+% for i = 1:m
+%     subplot(m,1,i); % 创建一个m行1列的子图布局
+%     bar(1:T, squeeze(sum(transfer(i,:,:), 2)), 'stacked'); % 叠加柱状图表示该建筑与其他建筑的能量传输
+%     hold on;
+%     bar(1:T, discharge(i,:), 'FaceColor', colors(i,:), 'EdgeColor', 'none'); % 叠加储能放电
+%     bar(1:T, -charge(i,:), 'FaceColor', colors(i,:), 'EdgeColor', 'none', 'FaceAlpha', 0.5); % 叠加储能充电
+%     bar(1:T, grid_feed(i,:), 'FaceColor', [0 0 0], 'EdgeColor', 'none'); % 叠加与电网的能量交互
+%     hold off;
+%     title(['建筑 ' num2str(i) ' 的电能交互情况']);
+%     xlabel('时间 (小时)');
+%     ylabel('能量 (kWh)');
+%     legend({'建筑间传输', '储能放电', '储能充电', '与电网交互'}, 'Location', 'best');
+% %     ylim([-max(max(max(transfer))) max(max(max(transfer)))]); % 设置y轴范围
+% end
+% 
+% % 设置整个图形的标题
+% sgtitle('建筑之间的能量交互情况');
 end

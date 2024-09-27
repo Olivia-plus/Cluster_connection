@@ -71,6 +71,7 @@ disp(building_info);
 % % title('所有建筑节点的日光伏出力数据');
 % title('所有建筑节点的日净负荷数据');
 % colorbar; % 添加颜色条
+%                                            
 % grid on
 
 %% 根据提供的数据编写粒子群算法的集群划分代码
@@ -86,7 +87,7 @@ w = 0.8; % 惯性权重
 c1 = 1.5; % 学习因子 1
 c2 = 1.5; % 学习因子 2        
 electricity_price=0.45;% 建筑交易收益电价0.45元/度，恒定不变
-dc_cost_p=208;% 线路铺设成本208元/米【TODO:折旧到每一天】
+dc_cost_p=20;% 线路铺设成本20元/米【TODO:折旧到每一天,待查】
 
 net_load{num_buildings}=0;
     for i = 1:num_buildings
@@ -109,7 +110,7 @@ for i = 1:pop_size
 %             % 如果没有建筑，重新生成一个随机解
 %             particles(i, :) = randi(p, 1, num_buildings);
 %             end
-    [pbest_fitness(i,1),trade_power_1(i,1),]=calculate_fitness(particles(i, :),net_load, electricity_price, dc_cost_p,x,y,num_buildings,flexible_load_main,storage_capacity_main);
+    [pbest_fitness(i,1),trade_power_1(i,1),]=calculate_fitness(particles(i, :),load_curve,pv_curve,electricity_price, dc_cost_p,x,y,num_buildings,flexible_load_main,storage_capacity_main);% 【将net_load替换成了load_curve,pv_curve,便于计算柔性负荷最优调度】
 end
 pbest = particles; % 所有粒子个体最优位置  
 % 初始化全局历史最优粒子 
@@ -139,7 +140,7 @@ best_connectMatrix=zeros(num_buildings,num_buildings);% 最佳连接矩阵
                     % 做一个小的判断，只有满足划分要求的粒子才能进行适应度的计算
                    if num_mode_max < 8 && num_mode_min > 1
                         % 计算当前粒子的适应度值
-                        [fitness_valuse_personal(j,1),trade_power(j,1),bigMatrix]= calculate_fitness(particles(j, :), net_load, electricity_price, dc_cost_p,x,y,num_buildings,flexible_load_main,storage_capacity_main); 
+                        [fitness_valuse_personal(j,1),trade_power(j,1),bigMatrix]= calculate_fitness(particles(j, :),load_curve,pv_curve,electricity_price, dc_cost_p,x,y,num_buildings,flexible_load_main,storage_capacity_main); % 【将net_load替换成了load_curve,pv_curve,便于计算柔性负荷最优调度】
                         % 更新个体最优
                         if fitness_valuse_personal(j,1) < pbest_fitness(j,1)
                             pbest(j,:) = particles(j, :);
@@ -181,58 +182,7 @@ best_connectMatrix=zeros(num_buildings,num_buildings);% 最佳连接矩阵
 %         title('粒子适应度函数随迭代次数的变化');
 % end
 
-% %% 绘制相关性热力图
-% % 示例数据
-% % A = [1, -2, 3, -4, 5];
-% % B = [-1, 2, -3, 4, -5];
-% % C = [1, -1, 1, -1, 1];
-% 
-% % 原数组
-% arrays_original = net_load_curve;
-% % 取负数组,元胞
-% arrays_negative = cellfun(@(x) -x, arrays_original, 'UniformOutput', false);
-% 
-% % 初始化相关性矩阵
-% correlation_matrix = zeros(num_buildings);
-% 
-% % 计算原数组和负数组之间的相关性
-% for i = 1:num_buildings
-%     for j = 1:num_buildings
-%         [filtered_arr1, filtered_arr2] = filter_arrays(arrays_original{i}, arrays_negative{j});
-%         correlation_matrix(i, j) = calculate_correlation(filtered_arr1, filtered_arr2);
-%     end
-% end
-% 
-% % % 绘制热力图
-% % figure;
-% % colormap('cool'); % 设置颜色映射
-% % heatmap({'-A', '-B', '-C'}, {'A', 'B', 'C'}, correlation_matrix, 'Colormap', 'cool', 'ColorbarVisible', 'on', 'CellLabelColor', 'black');
-% % title('Correlation Heatmap');
-% 
-% figure;
-% % h = heatmap({'1', '2', '3','1', '2', '3','1', '2', '3','1', '2', '3','1', '2', '3','1', '2', '3','1', '2'}, {'A', 'B', 'C','A', 'B', 'C','A', 'B', 'C','A', 'B', 'C','A', 'B', 'C','A', 'B', 'C','A', 'B'}, correlation_matrix, 'ColorbarVisible', 'on', 'CellLabelColor', 'red');
-% h = heatmap( correlation_matrix, 'ColorbarVisible', 'on', 'CellLabelColor', 'black');
-% % colormap('parula'); % 设置颜色映射
-% colormap('default'); % 设置颜色映射
-% title('Correlation Heatmap');
-% 
-% 
-% % 处理异号元素的函数
-% function [filtered_arr1, filtered_arr2] = filter_arrays(arr1, arr2)
-%     mask = (arr1 .* arr2) > 0; % 保留同号元素
-%     filtered_arr1 = arr1(mask);
-%     filtered_arr2 = arr2(mask);
-% end
-% 
-% % 计算相关性的函数
-% function r = calculate_correlation(arr1, arr2)
-%     if isempty(arr1) || isempty(arr2)
-%         r = 0;
-%     else
-%         r = corrcoef(arr1, arr2);
-%         r = r(1, 2); % 取相关系数矩阵中的相关系数
-%     end
-% end
+
 
 % % 最优集群划分结果
 % best_labels = gbest;
