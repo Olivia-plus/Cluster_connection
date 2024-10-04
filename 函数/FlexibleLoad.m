@@ -204,7 +204,7 @@ cvx_begin
     
     % 目标函数：最大化光伏消纳率
 %     y=sum(sum((net_load_cluster>0)- grid_feed));【所有光伏量-未被消纳的（grid_feed<0）】
-    y=sum(pv_curve_cluster-load_curve_cluster>0)-sum(grid_feed>0);% 【逻辑有误,已修正】
+    y=sum((pv_curve_cluster-load_curve_cluster)>0-grid_feed>0);% 【逻辑有误,已修正】
     maximize(y)
     
     % 约束条件

@@ -49,7 +49,7 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
     fitness_prob=zeros(num_clusters,1);% 装每次集群计算后的数值
     min_cost=zeros(num_clusters);
     fitness_best_matrix=cell(1,num_clusters);
-    best_trade_volume_total_pr ob=zeros(num_clusters,1);
+    best_trade_volume_total_prob=zeros(num_clusters,1);
     fitness_connect=inf;
     %% 遍历每一个集群
     T=48;

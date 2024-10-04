@@ -6,7 +6,7 @@
 % 日期: 2024-09-08
 % 描述:适应度函数由成本和收益两个指标构成。收益由集群整体构成的新增光伏消纳量决定，成本由线路铺设投资成本决定。去掉模块度，同时在集群划分的过程中，将储能和可平移负荷的综合优化融合到目标函数最优化的求解中去。
 % 输入:  
-% 输出:  
+% 输出:   
 %**************************************************************************
 clear;
 clc;
@@ -22,8 +22,8 @@ num_buildings = 20;
 PlotBuildingLocations(x, y,type);
 % 显示每个建筑的位置和类型, '行列转换符,列转行
 building_info= table((1:num_buildings)', x', y', type', 'VariableNames', {'建筑编号', '横坐标', '纵坐标', '建筑类型'});
-disp('随机生成的建筑位置和类型：');
-disp(building_info);
+% disp('随机生成的建筑位置和类型：');
+% disp(building_info);
 % 绘制每个建筑的负荷曲线和光伏曲线以及净负荷图【最后再取消注释，这一步其实也不是很有必要，但是也写着】
 % 循环绘制每个建筑的曲线图
 % figure;
@@ -246,3 +246,13 @@ axis equal;
 hold off;
 
 
+% %% Example: Generate trees for n = 4 without storing all trees in memory
+% n = 4;
+% generate_trees_on_the_fly(n);
+%% 示例：生成 n = 4 的所有树并分配权值
+n = 4;
+find_all_tree_weights(n);
+
+%% 示例：生成 n = 4 的所有树并计算每棵树的边权和
+n = 4;
+process_all_trees(n);
