@@ -1,7 +1,7 @@
 % 计算适应度和更新速度和位置的函数 【将net_load替换成了load_curve,pv_curve,便于计算柔性负荷最优调度】
 % 涉及到两个函数，一个是柔性负荷的优化调度函数，传输最大功率矩阵；
 % 另外一个是线路传输的成本计算，涉及到最小生成树算法，树的权值为最大功率矩阵。目标是寻找到权值最小的生成树
-function [fitness,trade_power,bigMatrix] = calculate_fitness(cluster_solution,load_curve,pv_curve, electricity_price, dc_cost_p,x,y,num_buildings,flexible_load_main,storage_capacity_main)
+function [fitness,trade_power,bigMatrix] = calculate_fitness(cluster_solution,load_curve,pv_curve, electricity_price,x,y,num_buildings,flexible_load_main,storage_capacity_main)
     %% 处理集群的分类结果，得到每个集群的基本情况 传入[集群划分结果，净负荷，电价，直流线路铺设成本，坐标x,y,建筑的数量，柔性负荷，储能的容量]
     %% 创建一个元胞数组来装集群的分类情况，以此来寻找对应的建筑
     % 假设 clusters 是一个行向量，每个元素表示对应建筑所属的集群编号
@@ -17,13 +17,6 @@ function [fitness,trade_power,bigMatrix] = calculate_fitness(cluster_solution,lo
         % 将该数组添加到元胞数组中
         cluster_info{cluster_id} =indices;
     end
-% 假设建筑总数为m，集群数为n
-% m = 5; % 例如有5个建筑
-% n = 2; % 例如有2个集群
-
-% % 定义每个集群，集群内部建筑的编号
-% C{1} = [1, 2, 3]; % 集群1 包含建筑 1, 2, 3
-% C{2} = [4, 5];    % 集群2 包含建筑 4, 5
 
 %% 集群归属问题 表征全部建筑的连接情况
 % 初始化m x m矩阵
@@ -42,12 +35,12 @@ end
 relationshipMatrix = relationshipMatrix + eye(num_buildings);
 % 显示结果
 % disp(relationshipMatrix);
-
     num_clusters =  max_cluster; % 所有的集群数量
     % 获取元胞数组中行向量的大小，获取单个集群的规模
     % sizes = cellfun(@length, cluster_info); 
     fitness_prob=zeros(num_clusters,1);% 装每次集群计算后的数值
     min_cost=zeros(num_clusters);
+    PV_digest=zeros(num_clusters);
     fitness_best_matrix=cell(1,num_clusters);
     best_trade_volume_total_prob=zeros(num_clusters,1);
     fitness_connect=inf;
@@ -76,7 +69,7 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
             pv_curve_cluster_array=cell2mat(pv_curve_cluster');
         end
         % 柔性负荷调度
-        [PV_digest,P]=FlexibleLoad(m,load_curve_cluster_array,pv_curve_cluster_array,flexible_load,storage_capacity);%【增加传出的最大交换功率矩阵】
+        [PV_digest(c),P]=FlexibleLoad(m,load_curve_cluster_array,pv_curve_cluster_array,flexible_load,storage_capacity);%【增加传出的最大交换功率矩阵】
         [T,min_cost(c)]=connect_cost_min(P,m,x_cluster,y_cluster);%【x,y需要重新定义一下和处理】
 %         %% 循环遍历一个集群所有可能的连接情况【这里的m可能需要修改成为对应的集群中矩阵的尺寸,已修改】
 %         % 【TODO：最小生成树算法】
@@ -113,7 +106,6 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
 %                     
                     % 对当前矩阵进行处理，可以在这里进行你需要的操作
                     % disp(current_matrix); % 输出所有的矩阵可能
-        
             %       % 计算建筑之间的连接情况
             %         connectivity = zeros(num_buildings, num_buildings);% 建筑是否互联的关系矩阵
             %         for i = 1:num_buildings
@@ -125,10 +117,10 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
             %         end
             %    
 
-                    %% 计算电能交易量和直流线路铺设成本,这是对一个集群的，当然要遍历所有的集群【还没有遍历，已完成】这里的num——buildings需要修改为划分集群后的建筑的数量，需要重新编号
-                    trade_volume_total = 0;%总交易电量
-                    trade_volume=zeros(1,48);%实时交易电量，临时的变量
-                    dc_cost_total=0;
+        %% 计算电能交易量和直流线路铺设成本,这是对一个集群的，当然要遍历所有的集群【还没有遍历，已完成】这里的num——buildings需要修改为划分集群后的建筑的数量，需要重新编号
+%         trade_income_total =trade_income_total+PV_digest*electricity_price;%总交易电量
+%       trade_volume=zeros(1,48);%实时交易电量，临时的变量
+%                     dc_cost_total=0;
 %                     for i = 1:m
 %                         for j = 1:m
 %                             if current_matrix(i, j) == 1 % 如果两个建筑互联了【TODO：不需要这么复杂了，只需要考虑整体的建筑的交易即可，考虑跨建筑电量交易情况】
@@ -146,19 +138,19 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
 %                         end
 %                     end
 %                     trade_cost_total = trade_volume_total *electricity_price; % 计算交易电量收益 售电方的收益和购电方节省的电量
-                    % 计算适应度 目标函数
+        % 计算适应度 目标函数
 %                     total_cost =dc_cost_total - trade_cost_total; % 总成本为直流线路成本减去交易收入
-                     total_cost =min_cost; % 总成本为直流线路成本减去交易收入
-                    %加入一个判断
-                    if total_cost < fitness_connect
-                        fitness_connect = total_cost;
+%         total_cost =total_cost+min_cost; % 直流互联成本
+        %加入一个判断
+%                     if total_cost < fitness_connect
+%                         fitness_connect = total_cost;
 %                         best_matrix = current_matrix;
-                        best_matrix = T;
-                        best_trade_volume_total=trade_volume_total;
-                    end
-                    fitness_best_matrix{c}= best_matrix;
-                    fitness_prob(c,1) = fitness_connect; % 可能的最小总成本
-                    best_trade_volume_total_prob(c,1)= best_trade_volume_total;
+        best_matrix = T;
+%             best_trade_volume_total=trade_volume_total;
+%                     end
+        fitness_best_matrix{c}= best_matrix;
+%         fitness_prob(c,1) = fitness_connect; % 可能的最小总成本
+%         best_trade_volume_total_prob(c,1)= best_trade_volume_total;
 %     end
 % end
     end %所有集群遍历完毕，产生一种集群互联的情况，并带入下方集群模块度的计算中去
@@ -198,6 +190,6 @@ bigMatrix = (bigMatrix + bigMatrix')/2;
 % roh1 = modularity(relationshipMatrix,bigMatrix,e);
 
     %% 适应度 收益减去成本
-    fitness = -(PV_digest*electricity_price-sum(min_cost));
-    trade_power=PV_digest;
+    fitness = -(sum(PV_digest)*electricity_price-sum(min_cost));
+    trade_power=sum(PV_digest);
 end

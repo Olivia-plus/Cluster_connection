@@ -178,7 +178,7 @@ m = Build_num; % 建筑数量【待传入】
  ev_load = rand(m, 1) * 20*40*0;         % 每个建筑的电动汽车负荷（总量）
 % line_capacity =ones(m,m)* 0.75*1000*135;   % 建筑之间线路容量101.25KW【由老师发的资料数据所得】
  line_capacity = ones(m, m) * 101.25; % 线路容量，每条线还不一样？怪异【暂时不考虑】
-P_transMax_array = zeros(m,m);
+P_transMax_array = zeros(m,m,T);
 % https://www.bilibili.com/read/cv33635168/
 % 储能系统参数
 initial_soc = storage_capacity *0.2; % 初始储能状态 (设置为容量的一半)
@@ -206,7 +206,6 @@ cvx_begin
 %     y=sum(sum((net_load_cluster>0)- grid_feed));【所有光伏量-未被消纳的（grid_feed<0）】
     y=sum((pv_curve_cluster-load_curve_cluster)>0-grid_feed>0);% 【逻辑有误,已修正】
     maximize(y)
-    
     % 约束条件
     subject to
         % 能量平衡
@@ -227,7 +226,7 @@ cvx_begin
                     for t = 1:T
                         transfer(i, j, t) <= line_capacity(i, j); % 受线路容量限制 其实不是很受限制才对
                     end
-                    P_transMax_array(i,j)= sum(transfer(i, j, :));
+                    P_transMax_array(i,j,:)= transfer(i, j, :);
 %                 end
             end
         end

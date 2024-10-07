@@ -375,31 +375,31 @@ process_all_trees(n,x_cluster,y_cluster);
         T_min=min_index;
         min_cost=min_weight_sum;
         % 输出最小权重的树的结构及其权重
-        disp('Minimum Weight Tree:');
-        disp(tree_structures{T_min});  % 显示最小权值对应的树
-        disp(['Minimum Weight Sum: ', num2str(min_cost)]);  % 显示最小权值和
+%         disp('Minimum Weight Tree:');
+%         disp(tree_structures{T_min});  % 显示最小权值对应的树
+%         disp(['Minimum Weight Sum: ', num2str(min_cost)]);  % 显示最小权值和
     end
     
     %% 递归生成普吕弗序列并处理每棵树
     function [tree_weights, tree_structures] = generate_all_trees(seq, idx, n, tree_weights, tree_structures,x_cluster,y_cluster)
         if idx > length(seq)
             tree = prufer_to_tree(seq, n);  % 生成树
-            disp('Generated Tree:');
-            disp(tree);  % 显示生成的树（边列表）
+%             disp('Generated Tree:');
+%             disp(tree);  % 显示生成的树（边列表）
     
             % 调用计算权值的函数
             edge_weights = assign_tree_edge_weights_correct(n, tree,x_cluster,y_cluster);
             
             % 显示树的边及权重
-            disp('Edges with Weights:');
+%             disp('Edges with Weights:');
             for i = 1:size(tree, 1)
                 fprintf('%5d %5d %5d\n', tree(i, 1), tree(i, 2), edge_weights(i));
             end
             
             % 计算当前树的边权和
             edge_sum = sum(edge_weights);  % 计算边权和
-            disp(['Sum of edge weights: ', num2str(edge_sum)]);
-            disp('----------------------------');
+%             disp(['Sum of edge weights: ', num2str(edge_sum)]);
+%             disp('----------------------------');
             
             % 存储树的权重和结构
             tree_weights = [tree_weights; edge_sum];  % 将边权和加入权重数组
