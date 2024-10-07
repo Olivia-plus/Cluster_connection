@@ -233,7 +233,7 @@ for i = 1:n
         if connectMatrix(i,j) == 1
             % 绘制建筑i和建筑j之间的连线
             plot([coords(i,1) coords(j,1)], [coords(i,2) coords(j,2)], '-', 'Color', lineColor, 'LineWidth', lineWidth);
-        end
+        end 
     end
 end
 
@@ -245,14 +245,6 @@ grid on;
 axis equal;
 hold off;
 
-
-% %% Example: Generate trees for n = 4 without storing all trees in memory
+% 示例：生成 n = 4 的所有树并计算每棵树的边权和
 % n = 4;
-% generate_trees_on_the_fly(n);
-%% 示例：生成 n = 4 的所有树并分配权值
-n = 4;
-find_all_tree_weights(n);
-
-%% 示例：生成 n = 4 的所有树并计算每棵树的边权和
-n = 4;
-process_all_trees(n);
+% process_all_trees(n);

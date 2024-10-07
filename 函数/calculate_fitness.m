@@ -77,7 +77,7 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
         end
         % 柔性负荷调度
         [PV_digest,P]=FlexibleLoad(m,load_curve_cluster_array,pv_curve_cluster_array,flexible_load,storage_capacity);%【增加传出的最大交换功率矩阵】
-        [T,min_cost(c)]=nnewtree924(m,P,x_cluster,y_cluster);%【x,y需要重新定义一下和处理】
+        [T,min_cost(c)]=connect_cost_min(P,m,x_cluster,y_cluster);%【x,y需要重新定义一下和处理】
 %         %% 循环遍历一个集群所有可能的连接情况【这里的m可能需要修改成为对应的集群中矩阵的尺寸,已修改】
 %         % 【TODO：最小生成树算法】
 %        total_matrices=2^(m*(m-1)/2);% 总可能的矩阵数量
