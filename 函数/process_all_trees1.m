@@ -1,3 +1,6 @@
+n=4;
+process_all_trees(4);
+
 function process_all_trees(n)
     % 生成所有普吕弗序列，并将其转换为树
     prufer_sequence = zeros(1, n-2);  % 初始化长度为 n-2 的普吕弗序列

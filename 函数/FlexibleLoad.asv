@@ -215,9 +215,9 @@ y = sum(sum(max(cell2mat(pv_curve_cluster) - cell2mat(load_curve_cluster), 0) - 
         % 线路容量限制
         for i = 1:m
             for j = 1:m
-%                     for t = 1:T
-%                         transfer(i, j, t) <= line_capacity(i, j); % 受线路容量限制 其实不是很受限制才对
-%                     end
+                    for t = 1:T
+                        transfer(i, j, t) <= line_capacity(i, j); % 受线路容量限制 其实不是很受限制才对
+                    end
                     P_transMax_array(i,j,:)= transfer(i, j, :);
             end
         end
