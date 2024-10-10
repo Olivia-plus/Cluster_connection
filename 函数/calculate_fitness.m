@@ -59,16 +59,18 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
         pv_curve_cluster_array=zeros(m,T);
         x_cluster=zeros(m,1);
         y_cluster=zeros(m,1);
-        for q=1:m
-            flexible_load(q)=flexible_load_main(cluster_info{c}(q));    
-            x_cluster(q)=x(cluster_info{c}(q));
-            y_cluster(q)=y(cluster_info{c}(q));
-            storage_capacity(q)=storage_capacity_main(cluster_info{c}(q));
-            load_curve_cluster{q}=load_curve{cluster_info{c}(q)};
-            pv_curve_cluster{q}=pv_curve{cluster_info{c}(q)};
-        end
+                for q=1:m
+                    flexible_load(q)=flexible_load_main(cluster_info{c}(q));    
+                    x_cluster(q)=x(cluster_info{c}(q));
+                    y_cluster(q)=y(cluster_info{c}(q));
+                    storage_capacity(q)=storage_capacity_main(cluster_info{c}(q));
+                    load_curve_cluster{q}=load_curve{cluster_info{c}(q)};
+                    pv_curve_cluster{q}=pv_curve{cluster_info{c}(q)};
+                end
+                 load_curve_cluster_array=cell2mat(load_curve_cluster');
+                 pv_curve_cluster_array=cell2mat(pv_curve_cluster');
         % 柔性负荷调度
-        [PV_digest(c),P]=FlexibleLoad(m,load_curve_cluster,pv_curve_cluster,flexible_load,storage_capacity);%【增加传出的最大交换功率矩阵,之后去掉柔性负荷和储能】
+        [PV_digest(c),P]=FlexibleLoad(m,load_curve_cluster_array,pv_curve_cluster_array,flexible_load,storage_capacity);%【增加传出的最大交换功率矩阵,之后去掉柔性负荷和储能】
         [T,min_cost(c)]=connect_cost_min(P,m,x_cluster,y_cluster);%【x,y需要重新定义一下和处理】
 %         %% 循环遍历一个集群所有可能的连接情况【这里的m可能需要修改成为对应的集群中矩阵的尺寸,已修改】
 %         % 【TODO：最小生成树算法】
