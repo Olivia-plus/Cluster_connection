@@ -1,5 +1,5 @@
 % 构造函数：传入集群的建筑数据，需要传入三维的建筑功率传输矩阵，以及建筑的数量，建筑的x,y的值
-function [T_min,min_cost]=connect_cost_min(P,n,x_cluster,y_cluster)
+function [adjacency_matrix,min_cost]=connect_cost_min(P,n,x_cluster,y_cluster)
 % n = 4;
 process_all_trees(n,x_cluster,y_cluster);
 
@@ -374,10 +374,17 @@ process_all_trees(n,x_cluster,y_cluster);
         [min_weight_sum, min_index] = min(tree_weights);
         T_min=min_index;
         min_cost=min_weight_sum;
+        TREE=tree_structures{T_min};
         % 输出最小权重的树的结构及其权重
 %         disp('Minimum Weight Tree:');
 %         disp(tree_structures{T_min});  % 显示最小权值对应的树
 %         disp(['Minimum Weight Sum: ', num2str(min_cost)]);  % 显示最小权值和
+ % 将最小权重的树转换为0-1矩阵
+    adjacency_matrix = tree_to_adjacency_matrix(TREE, n);
+%  
+%     % 输出0-1矩阵
+%     disp('Adjacency Matrix:');
+%     disp(adjacency_matrix);
     end
     
     %% 递归生成普吕弗序列并处理每棵树
@@ -440,14 +447,18 @@ process_all_trees(n,x_cluster,y_cluster);
     
     %% 增加映射
     function edge_weights = assign_tree_edge_weights_correct(n, tree,x_cluster,y_cluster)
+        T=48;
         P_max=zeros(n,1);
         L_price=zeros(n,1);
+        node_values=zeros(n,n,T);
+        L_price_one=0;
+        L_price_last=0;
         M1=150; % 按照最大功率划分价格等级
         M2=50;
         M3=10;
         % 初始化每个节点的值为它的功率交互矩阵
         for i=1:n
-           node_values =P(i,:,:); 
+           node_values(i,:,:) =P(i,:,:); 
         end
 
         % 初始化建筑节点之间的距离矩阵
@@ -466,7 +477,20 @@ process_all_trees(n,x_cluster,y_cluster);
         
         % 保存每条边在原始树中的索引
         edge_index_map = 1:size(tree, 1); % 初始化索引映射
-        
+        if size(remaining_tree, 1) == 1
+            remaining_edge = remaining_tree(1, :);
+            original_edge_index = edge_index_map(1); % 通过映射找到原始索引
+            P_max_onedge= max(abs(sum(node_values(remaining_edge(1,1),:,:),2)));
+                switch true%导线横截面积
+                    case P_max_onedge>=M1
+                         L_price_one=150.48;
+                    case P_max_onedge>=M2&&P_max_onedge<M1
+                         L_price_one=52.11; 
+                    case P_max_onedge<M3
+                         L_price_one=9.77;
+                end
+            edge_weights(original_edge_index) =L_price_one*distance_matrix(remaining_edge(1,1), remaining_edge(1,2)); % 取两侧节点中较大的值
+        else
         % 逐层处理叶子节点
         while size(remaining_tree, 1) > 1
             % 计算每个节点的度数
@@ -487,10 +511,9 @@ process_all_trees(n,x_cluster,y_cluster);
                     if remaining_tree(j, 1) == leaf || remaining_tree(j, 2) == leaf
                         % 获取连接的另一个节点
                         connected_node = remaining_tree(j, 1) + remaining_tree(j, 2) - leaf;
-                        
                         % 给原始树中的对应边赋值，使用 edge_index_map 来找到原始索引
                         original_edge_index = edge_index_map(j); % 通过映射找到原始索引
-                        P_max(leaf)= max(abs(sum(node_values(leaf,:,:),2)));
+                        P_max(leaf)= max(sum(node_values(leaf,:,:),2));
                         switch true%导线横截面积
                            case P_max(leaf)>=M1
                                  L_price(leaf)=150.48;% 【价格规格是几毛钱/米  400/10/365 待查】
@@ -528,13 +551,27 @@ process_all_trees(n,x_cluster,y_cluster);
                 switch true%导线横截面积
                    case P_max_last>=M1
                          L_price_last=150.48;
-                   case P_max_last>=M2&&P_max(leaf)<M1
+                   case P_max_last>=M2&&P_max_last<M1
                          L_price_last=52.11; 
                    case P_max_last<M3
                          L_price_last=9.77;
                 end
             edge_weights(original_edge_index) =L_price_last*distance_matrix(remaining_edge(1,1), remaining_edge(1,2)); % 取两侧节点中较大的值
         end
+        end
     end
+%% 辅助函数：将树的边结构转换为0-1邻接矩阵
+function adjacency_matrix = tree_to_adjacency_matrix(tree, n)
+    % 初始化 n x n 的零矩阵
+    adjacency_matrix = zeros(n, n);
+    
+    % 遍历树的边，将相连的节点对应的矩阵位置设置为1
+    for i = 1:size(tree, 1)
+        node1 = tree(i, 1);
+        node2 = tree(i, 2);
+        adjacency_matrix(node1, node2) = 1;
+        adjacency_matrix(node2, node1) = 1;  % 对称矩阵，保证无向图
+    end
+end
 end
 

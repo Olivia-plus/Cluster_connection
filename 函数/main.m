@@ -77,7 +77,7 @@ building_info= table((1:num_buildings)', x', y', type', 'VariableNames', {'建�
 %% 根据提供的数据编写粒子群算法的集群划分代码
 %% 基本参数设置
 max_iter = 50; % 最大迭代次数
-pop_size = 100; % 种群规模
+pop_size = 4; % 种群规模
 dim=num_buildings; % 粒子维度
 % ub=num_buildings; %集群划分个数上限
 % lb=1; %集群划分个数下限
@@ -138,7 +138,7 @@ best_connectMatrix=zeros(num_buildings,num_buildings);% 最佳连接矩阵
                     [~,idy]=min(h);
                     num_mode_max=h(idx);
                     num_mode_min=h(idy);
-                    % 做一个小的判断，只有满足划分要求的粒子才能进行适应度的计算
+                    % 做一个小的判断，只有满足划分要求的粒子才能进行适应度的计算【需要重新设计】
                    if num_mode_max < 8 && num_mode_min > 1
                         % 计算当前粒子的适应度值
                         [fitness_valuse_personal(j,1),trade_power(j,1),bigMatrix]= calculate_fitness(particles(j, :),load_curve,pv_curve,electricity_price,x,y,num_buildings,flexible_load_main,storage_capacity_main); % 【将net_load替换成了load_curve,pv_curve,便于计算柔性负荷最优调度】

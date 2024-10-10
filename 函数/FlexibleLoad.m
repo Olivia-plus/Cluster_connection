@@ -544,10 +544,10 @@ cvx_begin
         
         % 柔性负荷与电动汽车负荷调度限制
         for i = 1:m
-             sum(flex_dispatch(i, :)) = flexible_load(i); % 柔性负荷调度总量限制
-%             sum(ev_dispatch(i, :)) = ev_load(i); % 电动汽车负荷调度总量限制
-%             flex_dispatch(i, :) >= 0;
-%             ev_dispatch(i, :) >= 0;
+             sum(flex_dispatch(i, :)) == flexible_load(i); % 柔性负荷调度总量限制
+             sum(ev_dispatch(i, :)) == ev_load(i); % 电动汽车负荷调度总量限制
+             flex_dispatch(i, :) >= 0;
+             ev_dispatch(i, :) >= 0;
         end
         
         % 储能充放电限制
@@ -576,12 +576,6 @@ cvx_begin
 %         % 回馈电网的能量不能为负值 【可以为负，为负的部分就是从电网取电的过程，当光伏不能满足负荷要求的时候，就会向电网取电】
 %         grid_feed >= 0;
 
-    % 柔性负荷与电动汽车负荷调度限制
-    flex_dispatch >= 0;
-    ev_dispatch >= 0;
-    flex_dispatch <= flexible_load;
-    ev_dispatch <= ev_load;
-    
     % 储能充放电限制
     charge >= 0;
     charge <= charge_rate;    % 现在 charge_rate 和 charge 同维度

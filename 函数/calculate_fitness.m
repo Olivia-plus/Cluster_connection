@@ -39,8 +39,8 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
     % 获取元胞数组中行向量的大小，获取单个集群的规模
     % sizes = cellfun(@length, cluster_info); 
     fitness_prob=zeros(num_clusters,1);% 装每次集群计算后的数值
-    min_cost=zeros(num_clusters);
-    PV_digest=zeros(num_clusters);
+    min_cost=zeros(1,num_clusters);
+    PV_digest=zeros(1,num_clusters);
     fitness_best_matrix=cell(1,num_clusters);
     best_trade_volume_total_prob=zeros(num_clusters,1);
     fitness_connect=inf;
@@ -71,7 +71,7 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
                  pv_curve_cluster_array=cell2mat(pv_curve_cluster');
         % 柔性负荷调度
         [PV_digest(c),P]=FlexibleLoad(m,load_curve_cluster_array,pv_curve_cluster_array,flexible_load,storage_capacity);%【增加传出的最大交换功率矩阵,之后去掉柔性负荷和储能】
-        [T,min_cost(c)]=connect_cost_min(P,m,x_cluster,y_cluster);%【x,y需要重新定义一下和处理】
+        [T_matrix,min_cost(c)]=connect_cost_min(P,m,x_cluster,y_cluster);%【x,y需要重新定义一下和处理】
 %         %% 循环遍历一个集群所有可能的连接情况【这里的m可能需要修改成为对应的集群中矩阵的尺寸,已修改】
 %         % 【TODO：最小生成树算法】
 %        total_matrices=2^(m*(m-1)/2);% 总可能的矩阵数量
@@ -146,7 +146,7 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
 %                     if total_cost < fitness_connect
 %                         fitness_connect = total_cost;
 %                         best_matrix = current_matrix;
-        best_matrix = T;
+        best_matrix = T_matrix;
 %             best_trade_volume_total=trade_volume_total;
 %                     end
         fitness_best_matrix{c}= best_matrix;
