@@ -76,7 +76,7 @@ building_info= table((1:num_buildings)', x', y', type', 'VariableNames', {'建�
 
 %% 根据提供的数据编写粒子群算法的集群划分代码
 %% 基本参数设置
-max_iter = 50; % 最大迭代次数
+max_iter = 5; % 最大迭代次数
 pop_size = 4; % 种群规模
 dim=num_buildings; % 粒子维度
 % ub=num_buildings; %集群划分个数上限
@@ -111,7 +111,7 @@ for i = 1:pop_size
 %             % 如果没有建筑，重新生成一个随机解
 %             particles(i, :) = randi(p, 1, num_buildings);
 %             end
-    [pbest_fitness(i,1),trade_power_1(i,1),]=calculate_fitness(particles(i, :),load_curve,pv_curve,electricity_price,x,y,num_buildings,flexible_load_main,storage_capacity_main);% 【将net_load替换成了load_curve,pv_curve,便于计算柔性负荷最优调度】
+    [pbest_fitness(i,1),trade_power_1(i,1),bigMatrix1]=calculate_fitness(particles(i, :),load_curve,pv_curve,electricity_price,x,y,num_buildings,flexible_load_main,storage_capacity_main);% 【将net_load替换成了load_curve,pv_curve,便于计算柔性负荷最优调度】
 end
 pbest = particles; % 所有粒子个体最优位置  
 % 初始化全局历史最优粒子 
@@ -130,16 +130,18 @@ best_connectMatrix=zeros(num_buildings,num_buildings);% 最佳连接矩阵
         for iter = 1:max_iter 
             % 对所有的粒子遍历
             for j = 1:pop_size
-                    % 更新个体的位置和速度
-                    [particles(j,:),velocity(j,:)] = update_particle_position(particles(j, :), pbest(j, :), gbest, w, c1, c2,velocity(j,:),vmax,max_num_cluster); 
-                    % 求最大集群中建筑的个数
-                    [h,edges]=histcounts(particles(j, :));
-                    [~,idx]=max(h);
-                    [~,idy]=min(h);
-                    num_mode_max=h(idx);
-                    num_mode_min=h(idy);
-                    % 做一个小的判断，只有满足划分要求的粒子才能进行适应度的计算【需要重新设计】
-                   if num_mode_max < 8 && num_mode_min > 1
+                particles(j, :)= GenerateRandomArray(num_buildings, max_num_cluster);
+%                     % 更新个体的位置和速度
+%                     [particles(j,:),velocity(j,:)] = update_particle_position(particles(j, :), pbest(j, :), gbest, w, c1, c2,velocity(j,:),vmax,max_num_cluster); 
+%                     % 求最大集群中建筑的个数
+%                     [h,edges]=histcounts(particles(j, :));
+%                     [~,idx]=max(h);
+%                     [~,idy]=min(h);
+%                     num_mode_max=h(idx);
+%                     num_mode_min=h(idy);
+%                     % 做一个小的判断，只有满足划分要求的粒子才能进行适应度的计算【需要重新设计】
+%                    if num_mode_max < 8 && num_mode_min > 1
+
                         % 计算当前粒子的适应度值
                         [fitness_valuse_personal(j,1),trade_power(j,1),bigMatrix]= calculate_fitness(particles(j, :),load_curve,pv_curve,electricity_price,x,y,num_buildings,flexible_load_main,storage_capacity_main); % 【将net_load替换成了load_curve,pv_curve,便于计算柔性负荷最优调度】
                         % 更新个体最优
@@ -154,9 +156,9 @@ best_connectMatrix=zeros(num_buildings,num_buildings);% 最佳连接矩阵
                             trade=trade_power(j,1);
                             best_connectMatrix=bigMatrix;
                         end
-                   else
-                       fitness_valuse_personal(j,1)=inf;
-                   end
+%                    else
+%                        fitness_valuse_personal(j,1)=inf;
+%                    end
             end
             % 每代最优解对应的目标函数值
             Convergence_curve(iter)=gbest_fitness;
@@ -208,35 +210,241 @@ best_connectMatrix=zeros(num_buildings,num_buildings);% 最佳连接矩阵
 % grid on;
 % hold off;
 
-% 假设的建筑坐标数据 (每行一个建筑的 (x, y) 坐标)
-coords = [x',y']; 
+% % 假设的建筑坐标数据 (每行一个建筑的 (x, y) 坐标)
+% coords = [x',y']; 
+% 
+% % 假设的0-1连接矩阵 (20x20 矩阵)
+% connectMatrix = best_connectMatrix; % 示例数据，实际应替换为你的矩阵
+% % 绘制建筑坐标
+% figure;
+% hold on;
+% 
+% % 设置颜色和线条样式
+% markerColor = [0.8, 0.2, 0.2]; % 红色
+% markerSize = 8; % 标记大小
+% lineColor = [0.2, 0.6, 1.0]; % 蓝色
+% lineWidth = 2; % 线宽
+% 
+% % 绘制建筑位置
+% plot(coords(:,1), coords(:,2), 'o', 'MarkerEdgeColor', markerColor, 'MarkerFaceColor', markerColor, 'MarkerSize', markerSize, 'LineWidth', 1.5);
+% text(coords(:,1), coords(:,2), num2str((1:num_buildings)'), 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'right', 'FontSize', 8);
+% 
+% % 绘制连接线
+% [n, m] = size(connectMatrix);
+% for i = 1:n
+%     for j = i+1:m
+%         if connectMatrix(i,j) == 1
+%             % 绘制建筑i和建筑j之间的连线
+%             plot([coords(i,1) coords(j,1)], [coords(i,2) coords(j,2)], '-', 'Color', lineColor, 'LineWidth', lineWidth);
+%         end 
+%     end
+% end
+
+% %% 假设的建筑坐标数据 (每行一个建筑的 (x, y) 坐标)
+% coords = [x',y'];
+% 
+% % 假设的0-1连接矩阵 (20x20 矩阵)
+% connectMatrix = best_connectMatrix; % 示例数据，实际应替换为你的矩阵
+% num_buildings = size(coords, 1); % 建筑数量
+% 
+% % 获取连通组件（建筑群体）
+% G = graph(connectMatrix); % 将连接矩阵转为图
+% [bin, binsizes] = conncomp(G); % bin表示每个节点所属的连通分量，binsizes表示每个分量的大小
+% 
+% % 获取颜色
+% unique_bins = unique(bin);
+% num_clusters = length(unique_bins); % 连通子图数量
+% colors = lines(num_clusters); % 使用不同颜色表示不同的连通子图
+% 
+% % 设置线条样式
+% lineColor_other = [0.5, 0.5, 0.5]; % 灰色，用于其他不连通的树枝
+% lineWidth = 2; % 线宽
+% markerSize = 8; % 标记大小
+% 
+% % 绘制建筑位置
+% figure;
+% hold on;
+% 
+% % 绘制所有建筑的节点
+% plot(coords(:,1), coords(:,2), 'o', 'MarkerEdgeColor', 'k', 'MarkerFaceColor', 'w', 'MarkerSize', markerSize, 'LineWidth', 1.5);
+% text(coords(:,1), coords(:,2), num2str((1:num_buildings)'), 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'right', 'FontSize', 8);
+% 
+% % 绘制连通的树枝和节点圈
+% for k = 1:num_clusters
+%     % 获取属于当前连通分量的建筑索引
+%     cluster_nodes = find(bin == unique_bins(k));
+%     
+%     % 画圈圈出这些节点
+%     cluster_coords = coords(cluster_nodes, :);
+%     hull = convhull(cluster_coords(:,1), cluster_coords(:,2)); % 获取凸包
+%     fill(cluster_coords(hull,1), cluster_coords(hull,2), colors(k,:), 'FaceAlpha', 0.1, 'EdgeColor', 'none'); % 轻微填充
+%     
+%     % 为当前群体绘制线
+%     for i = 1:length(cluster_nodes)
+%         for j = i+1:length(cluster_nodes)
+%             node1 = cluster_nodes(i);
+%             node2 = cluster_nodes(j);
+%             if connectMatrix(node1, node2) == 1
+%                 % 绘制建筑 node1 和 node2 之间的连线，使用特定颜色
+%                 plot([coords(node1,1) coords(node2,1)], [coords(node1,2) coords(node2,2)], '-', 'Color', colors(k,:), 'LineWidth', lineWidth);
+%             end
+%         end
+%     end
+% end
+% 
+% % 绘制其他未连通的建筑之间的线
+% [n, m] = size(connectMatrix);
+% for i = 1:n
+%     for j = i+1:m
+%         if connectMatrix(i,j) == 1 && bin(i) ~= bin(j)
+%             % 绘制不同连通分量间的连线，使用灰色
+%             plot([coords(i,1) coords(j,1)], [coords(i,2) coords(j,2)], '--', 'Color', lineColor_other, 'LineWidth', lineWidth);
+%         end
+%     end
+% end
+% 
+% hold off;
+
+% %% 假设的建筑坐标数据 (每行一个建筑的 (x, y) 坐标)
+% coords = [x', y'];
+% 
+% % 假设的0-1连接矩阵 (20x20 矩阵)
+% connectMatrix = best_connectMatrix; % 示例数据，实际应替换为你的矩阵
+% num_buildings = size(coords, 1); % 建筑数量
+% 
+% % 获取连通组件（建筑群体）
+% G = graph(connectMatrix); % 将连接矩阵转为图
+% [bin, binsizes] = conncomp(G); % bin表示每个节点所属的连通分量，binsizes表示每个分量的大小
+% 
+% % 获取颜色
+% unique_bins = unique(bin);
+% num_clusters = length(unique_bins); % 连通子图数量
+% colors = lines(num_clusters); % 使用不同颜色表示不同的连通子图
+% 
+% % 设置线条样式
+% lineColor_other = [0.5, 0.5, 0.5]; % 灰色，用于不同连通分量之间的线
+% lineWidth = 2; % 线宽
+% markerSize = 8; % 标记大小
+% 
+% % 绘制建筑位置
+% figure;
+% hold on;
+% 
+% % 绘制所有建筑的节点
+% plot(coords(:,1), coords(:,2), 'o', 'MarkerEdgeColor', 'k', 'MarkerFaceColor', 'w', 'MarkerSize', markerSize, 'LineWidth', 1.5);
+% text(coords(:,1), coords(:,2), num2str((1:num_buildings)'), 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'right', 'FontSize', 8);
+% 
+% % 绘制连通的树枝和节点圈
+% for k = 1:num_clusters
+%     % 获取属于当前连通分量的建筑索引
+%     cluster_nodes = find(bin == unique_bins(k));
+%     
+%     % 如果连通分量内的建筑数量大于1，画圈圈出这些节点
+%     if length(cluster_nodes) > 1
+%         cluster_coords = coords(cluster_nodes, :);
+%         hull = convhull(cluster_coords(:,1), cluster_coords(:,2)); % 获取凸包
+%         fill(cluster_coords(hull,1), cluster_coords(hull,2), colors(k,:), 'FaceAlpha', 0.1, 'EdgeColor', 'none'); % 轻微填充
+%     end
+%     
+%     % 为当前群体绘制线（包括仅两个节点的群体）
+%     for i = 1:length(cluster_nodes)
+%         for j = i+1:length(cluster_nodes)
+%             node1 = cluster_nodes(i);
+%             node2 = cluster_nodes(j);
+%             if connectMatrix(node1, node2) == 1
+%                 % 绘制建筑 node1 和 node2 之间的连线，使用特定颜色
+%                 plot([coords(node1,1) coords(node2,1)], [coords(node1,2) coords(node2,2)], '-', 'Color', colors(k,:), 'LineWidth', lineWidth);
+%             end
+%         end
+%     end
+% end
+% 
+% % 绘制其他未连通的建筑之间的线
+% [n, m] = size(connectMatrix);
+% for i = 1:n
+%     for j = i+1:m
+%         if connectMatrix(i,j) == 1 && bin(i) ~= bin(j)
+%             % 绘制不同连通分量间的连线，使用灰色
+%             plot([coords(i,1) coords(j,1)], [coords(i,2) coords(j,2)], '--', 'Color', lineColor_other, 'LineWidth', lineWidth);
+%         end
+%     end
+% end
+% 
+% hold off;
+
+%% 绘制建筑互联图
+coords = [x', y'];
 
 % 假设的0-1连接矩阵 (20x20 矩阵)
 connectMatrix = best_connectMatrix; % 示例数据，实际应替换为你的矩阵
-% 绘制建筑坐标
+num_buildings = size(coords, 1); % 建筑数量
+
+% 获取连通组件（建筑群体）
+G = graph(connectMatrix); % 将连接矩阵转为图
+[bin, binsizes] = conncomp(G); % bin表示每个节点所属的连通分量，binsizes表示每个分量的大小
+
+% 获取颜色
+unique_bins = unique(bin);
+num_clusters = length(unique_bins); % 连通子图数量
+colors = lines(num_clusters); % 使用不同颜色表示不同的连通子图
+
+% 设置线条样式
+lineColor_other = [0.5, 0.5, 0.5]; % 灰色，用于不同连通分量之间的线
+lineWidth = 2; % 线宽
+markerSize = 8; % 标记大小
+
+% 绘制建筑位置
 figure;
 hold on;
 
-% 设置颜色和线条样式
-markerColor = [0.8, 0.2, 0.2]; % 红色
-markerSize = 8; % 标记大小
-lineColor = [0.2, 0.6, 1.0]; % 蓝色
-lineWidth = 2; % 线宽
-
-% 绘制建筑位置
-plot(coords(:,1), coords(:,2), 'o', 'MarkerEdgeColor', markerColor, 'MarkerFaceColor', markerColor, 'MarkerSize', markerSize, 'LineWidth', 1.5);
+% 绘制所有建筑的节点
+plot(coords(:,1), coords(:,2), 'o', 'MarkerEdgeColor', 'k', 'MarkerFaceColor', 'w', 'MarkerSize', markerSize, 'LineWidth', 1.5);
 text(coords(:,1), coords(:,2), num2str((1:num_buildings)'), 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'right', 'FontSize', 8);
 
-% 绘制连接线
+% 绘制连通的树枝和节点圈
+for k = 1:num_clusters
+    % 获取属于当前连通分量的建筑索引
+    cluster_nodes = find(bin == unique_bins(k));
+    
+    % 如果连通分量内的建筑数量大于2，画圈圈出这些节点
+    if length(cluster_nodes) > 2
+        cluster_coords = coords(cluster_nodes, :);
+        hull = convhull(cluster_coords(:,1), cluster_coords(:,2)); % 获取凸包
+        fill(cluster_coords(hull,1), cluster_coords(hull,2), colors(k,:), 'FaceAlpha', 0.1, 'EdgeColor', 'none'); % 轻微填充
+    elseif length(cluster_nodes) == 2
+        % 当群体只有两个节点时，用矩形圈住
+        cluster_coords = coords(cluster_nodes, :);
+        rectangle('Position', [min(cluster_coords(:,1)) min(cluster_coords(:,2)) ...
+            abs(diff(cluster_coords(:,1))) abs(diff(cluster_coords(:,2)))], ...
+            'EdgeColor', colors(k,:), 'LineWidth', 1.5, 'LineStyle', '--');
+    end
+    
+    % 为当前群体绘制线（包括仅两个节点的群体）
+    for i = 1:length(cluster_nodes)
+        for j = i+1:length(cluster_nodes)
+            node1 = cluster_nodes(i);
+            node2 = cluster_nodes(j);
+            if connectMatrix(node1, node2) == 1
+                % 绘制建筑 node1 和 node2 之间的连线，使用特定颜色
+                plot([coords(node1,1) coords(node2,1)], [coords(node1,2) coords(node2,2)], '-', 'Color', colors(k,:), 'LineWidth', lineWidth);
+            end
+        end
+    end
+end
+
+% 绘制其他未连通的建筑之间的线
 [n, m] = size(connectMatrix);
 for i = 1:n
     for j = i+1:m
-        if connectMatrix(i,j) == 1
-            % 绘制建筑i和建筑j之间的连线
-            plot([coords(i,1) coords(j,1)], [coords(i,2) coords(j,2)], '-', 'Color', lineColor, 'LineWidth', lineWidth);
-        end 
+        if connectMatrix(i,j) == 1 && bin(i) ~= bin(j)
+            % 绘制不同连通分量间的连线，使用灰色
+            plot([coords(i,1) coords(j,1)], [coords(i,2) coords(j,2)], '--', 'Color', lineColor_other, 'LineWidth', lineWidth);
+        end
     end
 end
+
+hold off;
+
 
 % 设置图形属性
 xlabel('X坐标');

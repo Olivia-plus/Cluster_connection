@@ -193,6 +193,6 @@ bigMatrix = (bigMatrix + bigMatrix')/2;
 % roh1 = modularity(relationshipMatrix,bigMatrix,e);
 
     %% 适应度 收益减去成本
-    fitness = -(sum(PV_digest)*electricity_price-sum(min_cost));
+    fitness =-(sum(PV_digest)*electricity_price-sum(min_cost));
     trade_power=sum(PV_digest);
 end
