@@ -101,22 +101,22 @@ commercial_pv_curve =[0,0,0,0,0,0,0,0,0,0,0,0,14.22036,24.767127,37.683954,53.08
                 load_curve{j} = (0.5+rand())*office_load_curve;
                 pv_curve{j} = (0.5+rand())*office_pv_curve;
                 flexible_load(j)=(0.5+rand())*sum(office_load_curve)*1/3;
-                storage_capacity(j)=(0.5+rand())*0.2*sum(residential_load_curve);
+                storage_capacity(j)=(0.5+rand())*0.2*sum(office_load_curve);
             case '工业园区'
                 load_curve{j} = (0.5+rand())*industrial_load_curve;
                 pv_curve{j} = (0.5+rand())*industrial_pv_curve;
                 flexible_load(j)=(0.5+rand())*sum(industrial_load_curve)*1/3;
-                storage_capacity(j)=(0.5+rand())*0.2*sum(residential_load_curve);
+                storage_capacity(j)=(0.5+rand())*0.2*sum(industrial_load_curve);
             case '文化建筑'
                 load_curve{j} =(0.5+rand())* cultural_load_curve;
                 pv_curve{j} = (0.5+rand())*cultural_pv_curve;
                 flexible_load(j)=(0.5+rand())*sum(cultural_load_curve)*1/3;
-                storage_capacity(j)=(0.5+rand())*0.2*sum(residential_load_curve);
+                storage_capacity(j)=(0.5+rand())*0.2*sum(cultural_load_curve);
             case '商业建筑'
                 load_curve{j} =(0.5+rand())* commercial_load_curve;
                 pv_curve{j} =(0.5+rand())* commercial_pv_curve;
                 flexible_load(j)=(0.5+rand())*sum(commercial_load_curve)*1/3;
-                storage_capacity(j)=(0.5+rand())*0.2*sum(residential_load_curve);
+                storage_capacity(j)=(0.5+rand())*0.2*sum(commercial_load_curve);
             otherwise
                 error('Invalid building type');
         end

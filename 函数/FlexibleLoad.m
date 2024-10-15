@@ -528,8 +528,8 @@ cvx_begin
                 % 能量平衡：PV发电 + 接收能量 + 放电 = 需求 + 柔性负荷 + 电动汽车负荷 + 回馈电网的能量 + 传出能量 + 充电
 %               pv_curve_cluster{i}(t)+ sum(transfer(:, i, t)) + discharge(i, t)*storage_capacity(m)+ flex_dispatch(i, t) + ev_dispatch(i, t) ...
 %                     == grid_feed(i, t) + sum(transfer(i, :, t)) + charge(i, t)*storage_capacity(m)+load_curve_cluster{i}(t);
-                remaining_pv(i, t) + sum(transfer(:, i, t)) + discharge(i, t) + flex_dispatch(i, t) + ev_dispatch(i, t) + grid_purchase(i, t) ...
-                      == grid_feed(i, t) + sum(transfer(i, :, t)) + charge(i, t);
+                remaining_pv(i, t) + sum(transfer(:, i, t)) + discharge(i, t)  + ev_dispatch(i, t) + grid_purchase(i, t) ...
+                      == grid_feed(i, t) + sum(transfer(i, :, t)) + charge(i, t)+ flex_dispatch(i, t);
             end
         end
         

@@ -457,10 +457,10 @@ process_all_trees(n,x_cluster,y_cluster);
         M2=50;
         M3=10;
         % 初始化每个节点的值为它的功率交互矩阵
-        for i=1:n
-           node_values(i,:,:) =P(i,:,:); 
-        end
-
+%         for i=1:n
+%            node_values(i,:,:) =P(i,:,:); 
+%         end
+        node_values=P; 
         % 初始化建筑节点之间的距离矩阵
         distance_matrix=zeros(n,n);
         % 计算两两之间的距离
@@ -486,8 +486,10 @@ process_all_trees(n,x_cluster,y_cluster);
                          L_price_one=150.48;
                     case P_max_onedge>=M2&&P_max_onedge<M1
                          L_price_one=52.11; 
-                    case P_max_onedge<M3
+                    case P_max_onedge>=M3&&P_max_onedge<M2
                          L_price_one=9.77;
+                    case P_max_onedge<M3
+                         L_price_one=2;
                 end
             edge_weights(original_edge_index) =L_price_one*distance_matrix(remaining_edge(1,1), remaining_edge(1,2)); % 取两侧节点中较大的值
         else
@@ -513,14 +515,16 @@ process_all_trees(n,x_cluster,y_cluster);
                         connected_node = remaining_tree(j, 1) + remaining_tree(j, 2) - leaf;
                         % 给原始树中的对应边赋值，使用 edge_index_map 来找到原始索引
                         original_edge_index = edge_index_map(j); % 通过映射找到原始索引
-                        P_max(leaf)= max(sum(node_values(leaf,:,:),2));
+                        P_max(leaf)= max(abs(sum(node_values(leaf,:,:),2)));
                         switch true%导线横截面积
                            case P_max(leaf)>=M1
                                  L_price(leaf)=150.48;% 【价格规格是几毛钱/米  400/10/365 待查】
                            case P_max(leaf)>=M2&&P_max(leaf)<M1
                                  L_price(leaf)=52.11; 
+                           case P_max(leaf)>=M3&&P_max(leaf)<M2
+                                 L_price(leaf)=9.77; 
                            case P_max(leaf)<M3
-                                 L_price(leaf)=9.77;
+                                 L_price(leaf)=2;
                         end
                         edge_weights(original_edge_index) =L_price(leaf)*distance_matrix(leaf, connected_node);
                         
@@ -553,8 +557,10 @@ process_all_trees(n,x_cluster,y_cluster);
                          L_price_last=150.48;
                    case P_max_last>=M2&&P_max_last<M1
                          L_price_last=52.11; 
+                   case P_max_last>=M3&&P_max_last<M2
+                         L_price_last=9.77; 
                    case P_max_last<M3
-                         L_price_last=9.77;
+                         L_price_last=2;
                 end
             edge_weights(original_edge_index) =L_price_last*distance_matrix(remaining_edge(1,1), remaining_edge(1,2)); % 取两侧节点中较大的值
         end
