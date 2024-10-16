@@ -14,7 +14,7 @@ format short;% 默认精度
 tic
 %% 设定建筑的数量，地理坐标，以及建筑类型的分类
 % 设定建筑数量 20~100不等
-num_buildings = 20;
+num_buildings = 50;
 % 随机生成建筑横、纵坐标；建筑类型；负荷和光伏曲线分配
 % 建筑类型确定，负荷和光伏的曲线也就确定了【待优化】
 [x, y, type, load_curve, pv_curve,flexible_load_main,storage_capacity_main] = GenerateBuildingInfo(num_buildings);
@@ -81,16 +81,16 @@ building_info= table((1:num_buildings)', x', y', type', 'VariableNames', {'建�
 
 %% 根据提供的数据编写粒子群算法的集群划分代码
 % 基本参数设置
-max_iter = 5; % 最大迭代次数
-pop_size = 4; % 种群规模
+max_iter = 30; % 最大迭代次数
+pop_size = 20; % 种群规模
 dim=num_buildings; % 粒子维度
 % max_num_cluster =ceil(num_buildings/4); % 最大集群划分数量为建筑的总个数/2，ceil向上取整
-numClusters = 5;         % 集群数量
+numClusters = 8;         % 集群数量
 
 w = 0.5; % 惯性权重
 c1 = 1.5; % 学习因子 1
 c2 = 1.5; % 学习因子 2        
-velocityLimit=100;% 粒子速度限制
+velocityLimit=900;% 粒子速度限制
 coord=[x',y'];% 坐标
 electricity_price=0.25;% 建筑交易收益电价0.25元/度，恒定不变
 
@@ -211,10 +211,11 @@ best_connectMatrix=zeros(num_buildings,num_buildings);% 最佳连接矩阵
         ylabel('适应度');
         grid on;
 
-        disp(['集群最优适应度为 = ' num2str(-gbest) '元， '' 集群光伏总消纳量为 = ' num2str(trade) 'kWh']);
+        disp(['集群最优适应度为 = '  num2str(-gbest_fitness)  '元， '' 集群光伏总消纳量为 = ' num2str(trade) 'kWh']);
 
 %% 绘制建筑互联图
 connectMatrix = best_connectMatrix; % 示例数据，实际应替换为你的矩阵
+coords=coord;
 num_buildings = size(coords, 1); % 建筑数量
 
 % 获取连通组件（建筑群体）

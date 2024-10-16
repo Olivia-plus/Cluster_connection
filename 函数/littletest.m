@@ -605,7 +605,7 @@
 numPoints = 50;          % 随机生成的点数
 numClusters = 8;         % 集群数量
 numParticles = 10;       % 粒子群数量
-maxIter = 50;           % 最大迭代次数
+maxIter = 25;           % 最大迭代次数
 w = 0.5;                 % 惯性权重
 c1 = 1.5;                % 个体加速系数
 c2 = 1.5;                % 群体加速系数

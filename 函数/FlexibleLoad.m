@@ -477,76 +477,87 @@
 %% 说明：针对一个集群而言，故建筑的数量是变量，还需要知道建筑的编号
 % 储能的参数，需要根据现有的相关论文进行设计，建筑互联矩阵这个也得更改【无关互联矩阵】
 % 加入线路容量 市场电缆的粗细，成本 量化方法，成本代替路径作为线路权重 分档次，土建的成本
-function[y,P_transMax_array]=FlexibleLoad(Build_num,load_curve_cluster,pv_curve_cluster,flexible_load,storage_capacity)% 【TODO：不传入净负荷，改成光伏和负荷,已改】
+function[y,P_transMax_array]=FlexibleLoad(Build_num,load_curve_cluster,pv_curve_cluster,flexible_load,storage_capacity)
 % 参数设置 传入的是建筑的各种信息，对应编号的信息，日光伏和日净负荷曲线，可转移负荷，可平移负荷和电动汽车之类的东西，不需要互联的信息了，很好
 m = Build_num; % 建筑数量【待传入】
 T = 48; % 时间分段（24小时48个点）
 
 % 随机生成示例数据，根据建筑实际的容量配置【待传入】【可平移、可转移】
-PV_generation = pv_curve_cluster;  % 每个建筑在每个时段的PV发电量
-load_demand =load_curve_cluster;     % 每个建筑在每个时段的电力需求
-% flexible_load = rand(m, 1) * 30*40;   % 每个建筑的柔性负荷（可转移的负荷总量）【TODO：每个建筑设有自己的柔性负荷 1/3】
 ev_load = rand(m, 1) * 20*40*0;         % 每个建筑的电动汽车负荷（总量）
-% line_capacity =ones(m,m)* 0.75*1000*135;   % 建筑之间线路容量101.25KW【由老师发的资料数据所得】
-% line_capacity = ones(m, m) * 101.25; % 线路容量，每条线还不一样？怪异【暂时不考虑】
-% https://www.bilibili.com/read/cv33635168/
 
 % 储能系统参数
 initial_soc = storage_capacity *0.5; % 初始储能状态 (设置为容量的一半)
-% charge_rate = ones(m, 1) * 0.125;      % 储能充电速率【TODO：是否合理？一般储能电池容量和充放电速度之间的关系。0.25C用于调峰，48点，还要额外除以2。已完成】
-charge_rate=repmat(rand(m,1)*10,1,T);
-discharge_rate=repmat(rand(m,1)*10,1,T);
-% discharge_rate = rand(m, 1) * 0.125;   % 储能放电速率
-% discharge_rate = ones(m, 1) * 0.125;   % 储能放电速率
-storage_capacity_matrix = repmat(storage_capacity, 1, T); % 扩展 storage_capacity 为 m x T 矩阵
- 
-% 计算每个建筑的光伏发电自消纳部分（优先满足固定负荷）
-pv_self_consumption = min(PV_generation, load_demand);  % 每个建筑的固定负荷优先消纳光伏
-remaining_pv = PV_generation - pv_self_consumption;     % 固定负荷消纳后的剩余光伏
+charge_rate = ones(m, 1) * 0.125;      % 储能充电速率【TODO：是否合理？一般储能电池容量和充放电速度之间的关系。0.25C用于调峰，48点，还要额外除以2。已完成】
+discharge_rate = ones(m, 1) * 0.125;   % 储能放电速率
+
 % 优化变量
-cvx_clear;
-clear sum;
 cvx_begin
     variable transfer(m, m, T) % 每个时段建筑之间的能量传输
     variable flex_dispatch(m, T) % 每个时段柔性负荷调度
     variable ev_dispatch(m, T) % 每个时段电动汽车负荷调度
     variable grid_feed(m, T) % 每个时段电网的能量【有正有负】
-    variable grid_purchase(m, T)% 每个时段向电网购买的能量
     variable soc(m, T) % 储能系统的状态 (State of Charge)
     variable charge(m, T) % 每个时段储能充电
     variable discharge(m, T) % 每个时段储能放电
     
     % 目标函数：最大化光伏消纳率
-%     y=sum(sum(max(pv_curve_cluster-load_curve_cluster,0)-max(grid_feed,0))); max(pv_curve_cluster-load_curve_cluster,0)
-%     y = builtin('sum', builtin('sum',-max(grid_feed,0)));
-    maximize(sum(sum (remaining_pv-grid_feed )))
+
+%%计算不带柔性负载和储能的光伏消纳量    
+dragon=pv_curve_cluster- load_curve_cluster;
+dragon_pro=sum(dragon);
+% A=sum(dragon_pro(dragon_pro>0));
+% B=sum(dragon(dragon>0));
+% consumption=B-A;
+
+y =sum(sum(max(pv_curve_cluster - load_curve_cluster, 0)- max(grid_feed, 0)));
+maximize(y)
+
     % 约束条件
     subject to
         % 能量平衡
         for i = 1:m
             for t = 1:T
-                % 能量平衡：PV发电 + 接收能量 + 放电 = 需求 + 柔性负荷 + 电动汽车负荷 + 回馈电网的能量 + 传出能量 + 充电
-%               pv_curve_cluster{i}(t)+ sum(transfer(:, i, t)) + discharge(i, t)*storage_capacity(m)+ flex_dispatch(i, t) + ev_dispatch(i, t) ...
-%                     == grid_feed(i, t) + sum(transfer(i, :, t)) + charge(i, t)*storage_capacity(m)+load_curve_cluster{i}(t);
-                remaining_pv(i, t) + sum(transfer(:, i, t)) + discharge(i, t)  + ev_dispatch(i, t) + grid_purchase(i, t) ...
-                      == grid_feed(i, t) + sum(transfer(i, :, t)) + charge(i, t)+ flex_dispatch(i, t);
+                % 能量平衡：PV发电 + 接收能量 + 放电 = 馈电需求 + 柔性负荷 + 电动汽车负荷 + 回馈电网的能量 + 传出能量 + 充电
+            pv_curve_cluster(i,t)+ sum(transfer(:, i, t)) + discharge(i, t)*storage_capacity(i)  ...
+                    == grid_feed(i, t) + sum(transfer(i, :, t)) + charge(i, t)*storage_capacity(i)+load_curve_cluster(i,t)+ ev_dispatch(i, t)+ flex_dispatch(i, t);
             end
         end
         
-%         线路容量限制
-%         for i = 1:m
-%             for j = 1:m
-%                     for t = 1:T
-%                         transfer(i, j, t) <= line_capacity(i, j); % 受线路容量限制 其实不是很受限制才对
-%                     end
-%             end
-%         end
+       % grid_feed需要约束，即所有建筑缺电时不向电网输电，所有建筑不缺电时grid_feed不向电网索电  
+       for i=1:T
+           if all(dragon(:,i)<0)
+               grid_feed(:,i)<=0;
+           end
+            if all(dragon(:,i)>0)
+               grid_feed(:,i)>=0;
+           end
+       end
+%transfer需要约束 只有两两比较后相对不缺电的才能向相对缺电的输电，相对缺电的不能向相对缺电的输电,相对不缺电的不能从相对缺电的哪里偷电
+      for k=1:T
+        for i=1:m
+            for j=1:m
+                if( dragon(i,k)- dragon(j,k)<=0)
+                    transfer(i, j, k)==0;
+                end
+                if( dragon(i,k)- dragon(j,k)>0)
+                    transfer(i, j, k)>=0;
+                end
+%                 transfer(i, j, k)==-transfer(j, i, k);
+%                 if( dragon(i,k)*dragon(j,k)>=0)
+%                     transfer(i, j, k)==0;
+%                 end
+% %                 if( dragon(i,k)*dragon(j,k)<0)
+% %                     transfer(i, j, k)~=0;
+% %                 end
+            end
+        end
+      end
         
         % 柔性负荷与电动汽车负荷调度限制
         for i = 1:m
-             sum(flex_dispatch(i, :)) == flexible_load(i); % 柔性负荷调度总量限制
-             sum(ev_dispatch(i, :)) == ev_load(i); % 电动汽车负荷调度总量限制
-             flex_dispatch(i, :) >= 0;
+             sum(abs(flex_dispatch(i, :))) <= flexible_load(i); % 柔性负荷调度总量限制
+             sum(ev_dispatch(i, :)) == ev_load(i); % 电动汽车负荷调度总量限制【小于等于还是等于】
+              flex_dispatch(i, :) >= 0;
              ev_dispatch(i, :) >= 0;
         end
         
@@ -576,27 +587,27 @@ cvx_begin
 %         % 回馈电网的能量不能为负值 【可以为负，为负的部分就是从电网取电的过程，当光伏不能满足负荷要求的时候，就会向电网取电】
 %         grid_feed >= 0;
 
-    % 储能充放电限制
-    charge >= 0;
-    charge <= charge_rate;    % 现在 charge_rate 和 charge 同维度
-    discharge >= 0;
-    discharge <= discharge_rate;  % 现在 discharge_rate 和 discharge 同维度
+          % 储能充放电限制
+        for i = 1:m
+            charge(i, :) >= 0;
+            charge(i, :) <= charge_rate(i);
+            discharge(i, :) >= 0;
+            discharge(i, :) <= discharge_rate(i);
+        end
     
     % 储能容量限制
-    soc >= 0;
-    soc <= storage_capacity_matrix;  % 扩展后的储能容量矩阵
-    
+    for i = 1:m
+            soc(i, :) >= 0.1*storage_capacity(i);
+            soc(i, :) <= 0.9*storage_capacity(i);
+    end
+
     % 储能初始状态与状态更新（每小时）
     soc(:, 1) == initial_soc; % 初始时刻的储能状态
     for t = 2:T
         soc(:, t) == soc(:, t-1) + charge(:, t-1) - discharge(:, t-1); % 每小时的SOC变化
     end
+    soc(:, T) == initial_soc; % 最终状态等于初始状态
     
-    % 回馈电网的能量不能为负值
-    grid_feed >= 0;
-    
-    % 从电网购电不能为负值
-    grid_purchase >= 0;
 cvx_end
 
 % % 输出结果
@@ -619,8 +630,7 @@ disp(grid_feed);
 disp('Optimized Transfer:');
 disp(transfer);
 
-P_transMax_array=value(transfer);
-y=value(sum(sum(remaining_pv-grid_feed)));
+P_transMax_array=transfer;
 % 假设已经执行了优化模型，并得到了 transfer, charge, discharge, grid_feed 变量的值
 
 % 设置颜色

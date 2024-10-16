@@ -381,10 +381,6 @@ process_all_trees(n,x_cluster,y_cluster);
 %         disp(['Minimum Weight Sum: ', num2str(min_cost)]);  % 显示最小权值和
  % 将最小权重的树转换为0-1矩阵
     adjacency_matrix = tree_to_adjacency_matrix(TREE, n);
-%  
-%     % 输出0-1矩阵
-%     disp('Adjacency Matrix:');
-%     disp(adjacency_matrix);
     end
     
     %% 递归生成普吕弗序列并处理每棵树
@@ -450,16 +446,11 @@ process_all_trees(n,x_cluster,y_cluster);
         T=48;
         P_max=zeros(n,1);
         L_price=zeros(n,1);
-        node_values=zeros(n,n,T);
-        L_price_one=0;
-        L_price_last=0;
-        M1=150; % 按照最大功率划分价格等级
-        M2=50;
-        M3=10;
-        % 初始化每个节点的值为它的功率交互矩阵
-%         for i=1:n
-%            node_values(i,:,:) =P(i,:,:); 
-%         end
+%         L_price_one=0;
+%         L_price_last=0;
+%         M1=150; % 按照最大功率划分价格等级
+%         M2=50;
+%         M3=10;
         node_values=P; 
         % 初始化建筑节点之间的距离矩阵
         distance_matrix=zeros(n,n);
@@ -481,16 +472,18 @@ process_all_trees(n,x_cluster,y_cluster);
             remaining_edge = remaining_tree(1, :);
             original_edge_index = edge_index_map(1); % 通过映射找到原始索引
             P_max_onedge= max(abs(sum(node_values(remaining_edge(1,1),:,:),2)));
-                switch true%导线横截面积
-                    case P_max_onedge>=M1
-                         L_price_one=150.48;
-                    case P_max_onedge>=M2&&P_max_onedge<M1
-                         L_price_one=52.11; 
-                    case P_max_onedge>=M3&&P_max_onedge<M2
-                         L_price_one=9.77;
-                    case P_max_onedge<M3
-                         L_price_one=2;
-                end
+            P_max_onedge=P_max_onedge*1000/(3*380*0.85);%将功率转换为孔径
+            L_price_one=P_max_onedge;
+%                 switch true%导线横截面积
+%                     case P_max_onedge>=M1
+%                          L_price_one=150.48;
+%                     case P_max_onedge>=M2&&P_max_onedge<M1
+%                          L_price_one=52.11; 
+%                     case P_max_onedge>=M3&&P_max_onedge<M2
+%                          L_price_one=9.77;
+%                     case P_max_onedge<M3
+%                          L_price_one=2;
+%                 end
             edge_weights(original_edge_index) =L_price_one*distance_matrix(remaining_edge(1,1), remaining_edge(1,2)); % 取两侧节点中较大的值
         else
         % 逐层处理叶子节点
@@ -516,16 +509,18 @@ process_all_trees(n,x_cluster,y_cluster);
                         % 给原始树中的对应边赋值，使用 edge_index_map 来找到原始索引
                         original_edge_index = edge_index_map(j); % 通过映射找到原始索引
                         P_max(leaf)= max(abs(sum(node_values(leaf,:,:),2)));
-                        switch true%导线横截面积
-                           case P_max(leaf)>=M1
-                                 L_price(leaf)=150.48;% 【价格规格是几毛钱/米  400/10/365 待查】
-                           case P_max(leaf)>=M2&&P_max(leaf)<M1
-                                 L_price(leaf)=52.11; 
-                           case P_max(leaf)>=M3&&P_max(leaf)<M2
-                                 L_price(leaf)=9.77; 
-                           case P_max(leaf)<M3
-                                 L_price(leaf)=2;
-                        end
+                        P_max(leaf)=P_max(leaf)*1000/(3*380*0.85);%将功率转换为孔径
+                        L_price(leaf)=P_max(leaf);
+%                         switch true%导线横截面积
+%                            case P_max(leaf)>=M1
+%                                  L_price(leaf)=150.48;% 【价格规格是几毛钱/米  400/10/365 待查】
+%                            case P_max(leaf)>=M2&&P_max(leaf)<M1
+%                                  L_price(leaf)=52.11; 
+%                            case P_max(leaf)>=M3&&P_max(leaf)<M2
+%                                  L_price(leaf)=9.77; 
+%                            case P_max(leaf)<M3
+%                                  L_price(leaf)=2;
+%                         end
                         edge_weights(original_edge_index) =L_price(leaf)*distance_matrix(leaf, connected_node);
                         
                         % 将叶子节点的值加到相连节点上
@@ -552,16 +547,18 @@ process_all_trees(n,x_cluster,y_cluster);
             remaining_edge = remaining_tree(1, :);
             original_edge_index = edge_index_map(1); % 通过映射找到原始索引
             P_max_last= max(abs(max(sum(node_values(remaining_edge(1,1),:,:),2))),max(abs(sum(node_values(remaining_edge(1,2),:,:),2))));
-                switch true%导线横截面积
-                   case P_max_last>=M1
-                         L_price_last=150.48;
-                   case P_max_last>=M2&&P_max_last<M1
-                         L_price_last=52.11; 
-                   case P_max_last>=M3&&P_max_last<M2
-                         L_price_last=9.77; 
-                   case P_max_last<M3
-                         L_price_last=2;
-                end
+            P_max_last=P_max_last*1000/(3*380*0.85);
+            L_price_last=P_max_last;
+%                 switch true%导线横截面积
+%                    case P_max_last>=M1
+%                          L_price_last=150.48;
+%                    case P_max_last>=M2&&P_max_last<M1
+%                          L_price_last=52.11; 
+%                    case P_max_last>=M3&&P_max_last<M2
+%                          L_price_last=9.77; 
+%                    case P_max_last<M3
+%                          L_price_last=2;
+%                 end
             edge_weights(original_edge_index) =L_price_last*distance_matrix(remaining_edge(1,1), remaining_edge(1,2)); % 取两侧节点中较大的值
         end
         end
