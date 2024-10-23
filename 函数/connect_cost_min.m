@@ -1,7 +1,7 @@
 % 构造函数：传入集群的建筑数据，需要传入三维的建筑功率传输矩阵，以及建筑的数量，建筑的x,y的值
 function [adjacency_matrix,min_cost]=connect_cost_min(P,n,x_cluster,y_cluster)
 % n = 4;
-process_all_trees(n,x_cluster,y_cluster);
+[min_cost,adjacency_matrix]=process_all_trees(n,x_cluster,y_cluster,P);
 
 % % 示例：生成 n = 4 的所有树并计算每棵树的边权和
 % % function process_all_trees(n)
@@ -360,15 +360,14 @@ process_all_trees(n,x_cluster,y_cluster);
 % 
 % end
 
-    function process_all_trees(n,x_cluster,y_cluster)
+    function [min_cost,adjacency_matrix]=process_all_trees(n,x_cluster,y_cluster,P)
         prufer_sequence = zeros(1, n-2);  % 初始化长度为 n-2 的普吕弗序列
         
         % 初始化数组来存储所有树的权重和结构
         tree_weights = [];
         tree_structures = {};
-        
         % 生成所有的树并存储它们的信息
-        [tree_weights, tree_structures] = generate_all_trees(prufer_sequence, 1, n, tree_weights, tree_structures,x_cluster,y_cluster);
+        [tree_weights, tree_structures] = generate_all_trees(prufer_sequence, 1, n, tree_weights, tree_structures,x_cluster,y_cluster,P);
         
         % 找到最小权重的树
         [min_weight_sum, min_index] = min(tree_weights);
@@ -384,14 +383,14 @@ process_all_trees(n,x_cluster,y_cluster);
     end
     
     %% 递归生成普吕弗序列并处理每棵树
-    function [tree_weights, tree_structures] = generate_all_trees(seq, idx, n, tree_weights, tree_structures,x_cluster,y_cluster)
+    function [tree_weights, tree_structures] = generate_all_trees(seq, idx, n, tree_weights, tree_structures,x_cluster,y_cluster,P)
         if idx > length(seq)
             tree = prufer_to_tree(seq, n);  % 生成树
 %             disp('Generated Tree:');
 %             disp(tree);  % 显示生成的树（边列表）
     
             % 调用计算权值的函数
-            edge_weights = assign_tree_edge_weights_correct(n, tree,x_cluster,y_cluster);
+            edge_weights = assign_tree_edge_weights_correct(n, tree,x_cluster,y_cluster,P);
             
             % 显示树的边及权重
 %             disp('Edges with Weights:');
@@ -442,8 +441,7 @@ process_all_trees(n,x_cluster,y_cluster);
     end
     
     %% 增加映射
-    function edge_weights = assign_tree_edge_weights_correct(n, tree,x_cluster,y_cluster)
-        T=48;
+    function edge_weights = assign_tree_edge_weights_correct(n, tree,x_cluster,y_cluster,P)
         P_max=zeros(n,1);
         L_price=zeros(n,1);
 %         L_price_one=0;
@@ -472,7 +470,7 @@ process_all_trees(n,x_cluster,y_cluster);
             remaining_edge = remaining_tree(1, :);
             original_edge_index = edge_index_map(1); % 通过映射找到原始索引
             P_max_onedge= max(abs(sum(node_values(remaining_edge(1,1),:,:),2)));
-            P_max_onedge=P_max_onedge*1000/(3*380*0.85);%将功率转换为孔径
+            P_max_onedge=P_max_onedge*1000/(3*380*0.85);%将功率转换为孔径  
             L_price_one=P_max_onedge;
 %                 switch true%导线横截面积
 %                     case P_max_onedge>=M1

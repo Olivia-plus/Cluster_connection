@@ -2,6 +2,11 @@
 % 涉及到两个函数，一个是柔性负荷的优化调度函数，传输最大功率矩阵；
 % 另外一个是线路传输的成本计算，涉及到最小生成树算法，树的权值为最大功率矩阵。目标是寻找到权值最小的生成树
 function [fitness,trade_power,bigMatrix] = calculate_fitness(cluster_solution,load_curve,pv_curve, electricity_price,x,y,num_buildings,flexible_load_main,storage_capacity_main)
+    %等额本金参数
+    annualInterestRate = 4.8;    % 年利率百分比3.5 3.85 4.0
+    loanYears = 20;            % 还款年限
+%     fprintf('月还款金额为: %.2f 元\n', monthlyPayment);
+
     %% 处理集群的分类结果，得到每个集群的基本情况 传入[集群划分结果，净负荷，电价，直流线路铺设成本，坐标x,y,建筑的数量，柔性负荷，储能的容量]
     %% 创建一个元胞数组来装集群的分类情况，以此来寻找对应的建筑
     % 假设 clusters 是一个行向量，每个元素表示对应建筑所属的集群编号
@@ -55,8 +60,6 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
         storage_capacity=zeros(m,1);
         load_curve_cluster=cell(1,m);
         pv_curve_cluster=cell(1,m);
-        load_curve_cluster_array=zeros(m,T);
-        pv_curve_cluster_array=zeros(m,T);
         x_cluster=zeros(m,1);
         y_cluster=zeros(m,1);
                 for q=1:m
@@ -71,7 +74,7 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
                  pv_curve_cluster_array=cell2mat(pv_curve_cluster');
         % 柔性负荷调度
         [PV_digest(c),P]=FlexibleLoad(m,load_curve_cluster_array,pv_curve_cluster_array,flexible_load,storage_capacity);%【增加传出的最大交换功率矩阵,之后去掉柔性负荷和储能】
-        [T_matrix,min_cost(c)]=connect_cost_min(P,m,x_cluster,y_cluster);%【x,y需要重新定义一下和处理】
+        [T_matrix,min_cost(c)]=prim_connect_cost_min(P,m,x_cluster,y_cluster);%【x,y需要重新定义一下和处理】
 %         %% 循环遍历一个集群所有可能的连接情况【这里的m可能需要修改成为对应的集群中矩阵的尺寸,已修改】
 %         % 【TODO：最小生成树算法】
 %        total_matrices=2^(m*(m-1)/2);% 总可能的矩阵数量
@@ -191,8 +194,9 @@ bigMatrix = (bigMatrix + bigMatrix')/2;
 
 % e = complementarity(net_load,num_buildings);
 % roh1 = modularity(relationshipMatrix,bigMatrix,e);
-
-    %% 适应度 收益减去成本
-    fitness =-(sum(PV_digest)*electricity_price-sum(min_cost));
+principal=3*sum(min_cost);
+monthlyPayment = calculateEqualMonthlyPayment(principal, annualInterestRate, loanYears);
+    %% 适应度 收益减去成本 【结果成本有问题】
+    fitness =-(sum(PV_digest)*electricity_price-monthlyPayment/30);
     trade_power=sum(PV_digest);
 end
