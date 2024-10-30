@@ -20,6 +20,7 @@ format short;% 默认精度
 tic
 %% 设定建筑的数量，地理坐标，以及建筑类型的分类
 % 设定建筑数量 20~100不等
+rng(1)
 num_buildings = 30;
 % 随机生成建筑横、纵坐标；建筑类型；负荷和光伏曲线分配
 % 建筑类型确定，负荷和光伏的曲线也就确定了【待优化】
@@ -85,8 +86,8 @@ building_info= table((1:num_buildings)', x', y', type', 'VariableNames', {'建�
 
 %% 根据提供的数据编写粒子群算法的集群划分代码
 % 基本参数设置
-max_iter = 20; % 最大迭代次数
-pop_size = 20; % 种群规模
+max_iter = 5; % 最大迭代次数
+pop_size = 4; % 种群规模
 dim=num_buildings; % 粒子维度
 % numClusters = 5;         % 集群数量
 
@@ -117,7 +118,7 @@ velocities = cell(pop_size, 1); % 每个粒子的速度
 gbest_fitness_allcase=zeros(floor(num_buildings/3),1);
 trade_allcase=zeros(floor(num_buildings/3),1);
 connectMatrix=cell(1,floor(num_buildings/3));
-for numClusters=3:floor(num_buildings/3)
+for numClusters=5:floor(num_buildings/3)
         
         for i = 1:pop_size
             particles{i} = coord(randperm(num_buildings, numClusters), :);  % 随机选择质心
@@ -141,7 +142,12 @@ for numClusters=3:floor(num_buildings/3)
                 fitness_valuse_personal=zeros(pop_size,1);
                 trade_power=zeros(pop_size,1);
                 bigMatrix=cell(1,pop_size);
-               
+                digest_main_rate_personal=zeros(pop_size,1);
+                digest_extra_rate_personal=zeros(pop_size,1);
+                digest_native_rate_personal=zeros(pop_size,1);
+                pbest_digest_main_rate_personal=zeros(pop_size,1);
+                pbest_digest_extra_rate_personal=zeros(pop_size,1);
+                pbest_digest_native_rate_personal=zeros(pop_size,1);
                 % 迭代开始
                 for iter = 1:max_iter 
                     % 对所有的粒子遍历
@@ -155,7 +161,7 @@ for numClusters=3:floor(num_buildings/3)
                         valid = checkClusterValidity(coord, clusterIdx, numClusters);
                         % 计算适应度
                         if valid
-                            [fitness_valuse_personal(j),trade_power(j),bigMatrix{j}]= calculate_fitness(clusterIdx,load_curve,pv_curve,electricity_price,x,y,num_buildings,flexible_load_main,storage_capacity_main); % 【将net_load替换成了load_curve,pv_curve,便于计算柔性负荷最优调度】
+                            [fitness_valuse_personal(j),trade_power(j),bigMatrix{j},digest_main_rate_personal(j),digest_extra_rate_personal(j),digest_native_rate_personal(j)]= calculate_fitness(clusterIdx,load_curve,pv_curve,electricity_price,x,y,num_buildings,flexible_load_main,storage_capacity_main); % 【将net_load替换成了load_curve,pv_curve,便于计算柔性负荷最优调度】
                         else
                             fitness_valuse_personal(j) = inf;  % 不合法的集群划分给予惩罚
                         end
@@ -164,6 +170,9 @@ for numClusters=3:floor(num_buildings/3)
                         if fitness_valuse_personal(j) < pbest_fitness(j)
                             pbest{j}= particles{j};
                             pbest_fitness(j) = fitness_valuse_personal(j);
+                            pbest_digest_main_rate_personal(j)=digest_main_rate_personal(j);
+                            pbest_digest_extra_rate_personal(j)=digest_extra_rate_personal(j);
+                            pbest_digest_native_rate_personal(j)=digest_native_rate_personal(j);
                         end
         
                         % 更新全局最优
@@ -172,6 +181,9 @@ for numClusters=3:floor(num_buildings/3)
                             gbest_fitness = fitness_valuse_personal(j);
                             trade=trade_power(j);
                             best_connectMatrix=bigMatrix{j};
+                            gbest_digest_main_rate=pbest_digest_main_rate_personal(j);
+                            gbest_digest_extra_rate=pbest_digest_extra_rate_personal(j);
+                            gbest_digest_native_rate=pbest_digest_native_rate_personal(j);
                         end
                     end
         
@@ -223,15 +235,15 @@ for numClusters=3:floor(num_buildings/3)
                 connectMatrix{numClusters}=best_connectMatrix;
 end
                 [minValue,idx]=min(gbest_fitness_allcase);
-                disp(['集群最优适应度为 = '  num2str(-min(gbest_fitness_allcase))  '元， '' 集群光伏总消纳量为 = ' num2str(trade_allcase(idx)) 'kWh',' 最优集群划分数量为 = ' num2str(idx) '个']);
+                disp(['集群最优适应度为 = '  num2str(-min(gbest_fitness_allcase))  '元， '' 集群光伏总消纳量为 = ' num2str(trade_allcase(idx)) 'kWh',' 最优集群划分数量为 = ' num2str(idx) '个',newline,'光伏的总消纳率为=' num2str(gbest_digest_main_rate*100) '%;''光伏的额外消纳率为=' num2str(gbest_digest_extra_rate*100) '%;''光伏的本地自消纳率为=' num2str(gbest_digest_native_rate*100) '%']);
 
         %% 绘制建筑互联图
-        connectMatrix = connectMatrix{idx}; % 示例数据，实际应替换为你的矩阵
+        connect_Matrix = connectMatrix{idx}; % 示例数据，实际应替换为你的矩阵
         coords=coord;
         num_buildings = size(coords, 1); % 建筑数量
         
         % 获取连通组件（建筑群体）
-        G = graph(connectMatrix); % 将连接矩阵转为图
+        G = graph(connect_Matrix); % 将连接矩阵转为图
         [bin, binsizes] = conncomp(G); % bin表示每个节点所属的连通分量，binsizes表示每个分量的大小
         
         % 获取颜色
@@ -275,7 +287,7 @@ end
                 for j = i+1:length(cluster_nodes)
                     node1 = cluster_nodes(i);
                     node2 = cluster_nodes(j);
-                    if connectMatrix(node1, node2) == 1
+                    if connect_Matrix(node1, node2) == 1
                         % 绘制建筑 node1 和 node2 之间的连线，使用特定颜色
                         plot([coords(node1,1) coords(node2,1)], [coords(node1,2) coords(node2,2)], '-', 'Color', colors(k,:), 'LineWidth', lineWidth);
                     end
@@ -284,10 +296,10 @@ end
         end
         
         % 绘制其他未连通的建筑之间的线
-        [n, m] = size(connectMatrix);
+        [n, m] = size(connect_Matrix);
         for i = 1:n
             for j = i+1:m
-                if connectMatrix(i,j) == 1 && bin(i) ~= bin(j)
+                if connect_Matrix(i,j) == 1 && bin(i) ~= bin(j)
                     % 绘制不同连通分量间的连线，使用灰色
                     plot([coords(i,1) coords(j,1)], [coords(i,2) coords(j,2)], '--', 'Color', lineColor_other, 'LineWidth', lineWidth);
                 end
@@ -297,8 +309,8 @@ end
         hold off;
 
 % 设置图形属性
-xlabel('X坐标');
-ylabel('Y坐标');
+xlabel('X坐标/m');
+ylabel('Y坐标/m');
 title('建筑及其连接关系');
 grid on;
 axis equal;

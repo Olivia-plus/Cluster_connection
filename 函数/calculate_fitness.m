@@ -1,10 +1,10 @@
 % 计算适应度和更新速度和位置的函数 【将net_load替换成了load_curve,pv_curve,便于计算柔性负荷最优调度】
 % 涉及到两个函数，一个是柔性负荷的优化调度函数，传输最大功率矩阵；
 % 另外一个是线路传输的成本计算，涉及到最小生成树算法，树的权值为最大功率矩阵。目标是寻找到权值最小的生成树
-function [fitness,trade_power,bigMatrix] = calculate_fitness(cluster_solution,load_curve,pv_curve, electricity_price,x,y,num_buildings,flexible_load_main,storage_capacity_main)
+function [fitness,trade_power,bigMatrix,digest_main_rate,digest_extra_rate,digest_native_rate] = calculate_fitness(cluster_solution,load_curve,pv_curve, electricity_price,x,y,num_buildings,flexible_load_main,storage_capacity_main)
     %等额本金参数
-    annualInterestRate = 4.8;    % 年利率百分比3.5 3.85 4.0
-    loanYears = 20;            % 还款年限
+    annualInterestRate = 2.5;    % 年利率百分比0 0.5 1 1.5 2 2.5 3 3.5 4 4.5 5
+    loanYears = 30;            % 还款年限10 20 30 40 50 
 %     fprintf('月还款金额为: %.2f 元\n', monthlyPayment);
 
     %% 处理集群的分类结果，得到每个集群的基本情况 传入[集群划分结果，净负荷，电价，直流线路铺设成本，坐标x,y,建筑的数量，柔性负荷，储能的容量]
@@ -50,7 +50,7 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
     best_trade_volume_total_prob=zeros(num_clusters,1);
     fitness_connect=inf;
     %% 遍历每一个集群
-    T=48;
+%     T=48;
 %     net_load=load_curve-pv_curve;
     for c=1:num_clusters
         % 对进行柔性负荷调度函数传入的参数进行集群化处理
@@ -155,11 +155,13 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
         fitness_best_matrix{c}= best_matrix;
 %         fitness_prob(c,1) = fitness_connect; % 可能的最小总成本
          end
-       
 %         best_trade_volume_total_prob(c,1)= best_trade_volume_total;
 %     end
 % end
     end %所有集群遍历完毕，产生一种集群互联的情况，并带入下方集群模块度的计算中去
+       digest_main_rate=1-sum(sum(max(cell2mat(pv_curve')-cell2mat(load_curve'),0)))/sum(sum(cell2mat(pv_curve')))+sum(PV_digest)/sum(sum(cell2mat(pv_curve')));
+       digest_extra_rate=sum(PV_digest)/sum(sum(cell2mat(pv_curve')));
+       digest_native_rate=1-sum(sum(max(cell2mat(pv_curve')-cell2mat(load_curve'),0)))/sum(sum(cell2mat(pv_curve')));
 % 示例数据 归并成大的连接矩阵
 % clusters = { [1, 2, 3], [4, 5] }; % 建筑编号
 % connections = { [0 1 1; 1 0 1; 1 1 0], [0 1; 1 0] }; % 连接矩阵
