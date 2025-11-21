@@ -128,7 +128,7 @@
 %% 说明：针对一个集群而言，故建筑的数量是变量，还需要知道建筑的编号
 % 储能的参数，需要根据现有的相关论文进行设计，建筑互联矩阵这个也得更改【无关互联矩阵】
 % 加入线路容量 市场电缆的粗细，成本 量化方法，成本代替路径作为线路权重 分档次，土建的成本
-function[y,P_transMax_array]=FlexibleLoad(Build_num,load_curve_cluster,pv_curve_cluster,flexible_load,storage_capacity)
+function[y,P_transMax_array,PV_digestwithoutstorage]=FlexibleLoad(Build_num,load_curve_cluster,pv_curve_cluster,flexible_load,storage_capacity)
 % 参数设置 传入的是建筑的各种信息，对应编号的信息，日光伏和日净负荷曲线，可转移负荷，可平移负荷和电动汽车之类的东西，不需要互联的信息了，很好
 m = Build_num; % 建筑数量【待传入】
 T = 48; % 时间分段（24小时48个点）
@@ -154,8 +154,9 @@ cvx_begin
     % 目标函数：最大化光伏消纳率
 
 %%计算不带柔性负载和储能的光伏消纳量    
-dragon=pv_curve_cluster- load_curve_cluster;
+PV_digestwithoutstorage=sum(sum(max(pv_curve_cluster - load_curve_cluster, 0))) -sum(max(sum(pv_curve_cluster-load_curve_cluster),0));
 
+dragon=pv_curve_cluster-load_curve_cluster;
 % 光伏总量sum(pv_curve_cluster)  
 % 光伏建筑剩余光伏消纳量sum(max(pv_curve_cluster - load_curve_cluster, 0))  
 % 光伏新增消纳量sum(sum(max(pv_curve_cluster -load_curve_cluster, 0)- max(grid_feed, 0))) 
@@ -170,8 +171,10 @@ maximize(y)
         for i = 1:m
             for t = 1:T
                 % 能量平衡：PV发电 + 接收能量 + 放电 = 馈电需求 + 柔性负荷 + 电动汽车负荷 + 回馈电网的能量 + 传出能量 + 充电
-            pv_curve_cluster(i,t)+ sum(transfer(:, i, t)) + discharge(i, t)*storage_capacity(i)  ...
-                    == grid_feed(i, t) + sum(transfer(i, :, t)) + charge(i, t)*storage_capacity(i)+load_curve_cluster(i,t)+ ev_dispatch(i, t)+ flex_dispatch(i, t);
+%             pv_curve_cluster(i,t)+ sum(transfer(:, i, t)) + discharge(i, t)*storage_capacity(i)  ...
+%                     == grid_feed(i, t) + sum(transfer(i, :, t)) + charge(i, t)*storage_capacity(i)+load_curve_cluster(i,t)+ ev_dispatch(i, t)+ flex_dispatch(i, t);
+              pv_curve_cluster(i,t)+ sum(transfer(i, :, t)) + discharge(i, t)*storage_capacity(i)  ...
+                    == grid_feed(i, t)  + charge(i, t)*storage_capacity(i)+load_curve_cluster(i,t);
             end
         end
         
@@ -184,22 +187,22 @@ maximize(y)
                grid_feed(:,i)>=0;
            end
        end
-
-      for k=1:T
-        for i=1:m
+       
+       for k=1:T
+         for i=1:m
             for j=1:m
                 transfer(i, j, k)+transfer(j, i, k)==0;
             end
-        end
-      end
+         end
+       end
         
-        % 柔性负荷与电动汽车负荷调度限制
-        for i = 1:m
-             sum(abs(flex_dispatch(i, :))) <= flexible_load(i); % 柔性负荷调度总量限制
-             sum(ev_dispatch(i, :)) == ev_load(i); % 电动汽车负荷调度总量限制【小于等于还是等于】
-             flex_dispatch(i, :) >= 0;
-             ev_dispatch(i, :) >= 0;
-        end
+%         % 柔性负荷与电动汽车负荷调度限制
+%         for i = 1:m
+%              sum(abs(flex_dispatch(i, :))) <= flexible_load(i); % 柔性负荷调度总量限制
+%              sum(ev_dispatch(i, :)) == ev_load(i); % 电动汽车负荷调度总量限制【小于等于还是等于】
+%              flex_dispatch(i, :) >= 0;
+%              ev_dispatch(i, :) >= 0;
+%         end
 
           % 储能充放电限制
         for i = 1:m
@@ -246,15 +249,24 @@ cvx_end
 % disp(transfer);
 
 % 尖峰负荷削减分为两部分：第一部分，建筑直接互联功率互济产生的负荷削减；第二部分，加入储能之后，对负荷的进一步削减，
-% load_cut_curve=load_curve_cluster-
 
+
+%----------------------------------------------------------------------------------%
 % 计算有储能和光伏的负荷削减
 % load_curve_cluster 表示建筑的初始负荷需求
 % grid_feed 表示优化后从电网获取的能量
 % storage_discharge 表示储能放电量
-% % 1. 计算储能优化后的净负荷曲线
+
+%% 建筑负荷削减参数：
+% 负荷曲线、净负荷曲线（负荷-光伏）、有互联时的净负荷曲线（负荷-光伏-互联）、有互联和储能优化的净负荷曲线（负荷-光伏-储能-互联） 
+% 无储能的互联负荷削减、有储能的互联负荷削减
+% 无储能的互联负荷峰值削减、有储能的互联负荷峰值削减
+
+%% 2. 计算储能优化后的净负荷曲线
+net_load_curve_cluster=load_curve_cluster - pv_curve_cluster;
+net_load_curve_cluster_cut=min(load_curve_cluster, pv_curve_cluster);
 net_load_no_storage = max(load_curve_cluster - pv_curve_cluster, 0); % 无储能情况下的正净负荷
-net_load_with_storage = max(load_curve_cluster - pv_curve_cluster, 0) - discharge;
+net_load_with_storage = max(load_curve_cluster - pv_curve_cluster, 0) -  discharge .* storage_capacity;
 net_load_with_storage(net_load_with_storage < 0) = 0; % 负值修正为0
 % % 2. 设置绘图
 T = 48; % 每天48个时间点（每30分钟一个点）
@@ -270,72 +282,78 @@ load_with_pv_storage = load_curve_cluster - (pv_curve_cluster + discharge .* sto
 load_reduction = max(0, net_load_no_storage - load_with_pv_storage); % 加入互联储能之后的负荷削减
 
 
-% 绘制时序柱状图
-figure;
-hold on;
-for i = 1:m
-    % 每个建筑的负荷需求柱状图，按时间分布
-    subplot(m, 1, i);
-    
-    % 绘制无储能和光伏时的负荷
-%     bar(1:T, load_without_pv_storage(i, :), 'FaceColor', [0, 0.4470, 0.7410], 'EdgeColor', 'none'); 
-    bar(1:T, net_load_no_storage(i, :), 'FaceColor', [0, 0.4470, 0.7410], 'EdgeColor', 'none'); 
-    hold on;
-    
-    % 绘制优化后的负荷需求
-    bar(1:T, load_with_pv_storage(i, :), 'FaceColor', [0.8500, 0.3250, 0.0980], 'EdgeColor', 'none');
-    % 绘制储能优化后的净负荷曲线
-%     plot(time, net_load_with_storage, '-', 'Color', [0, 0.45, 0.74], 'LineWidth', 1.5, 'MarkerSize', 5, 'DisplayName', '储能优化后净负荷');
-    
-    % 绘制负荷削减
-    bar(1:T, load_reduction(i, :), 'FaceColor', [0.9290, 0.6940, 0.1250], 'EdgeColor', 'none', 'FaceAlpha', 0.5); 
-    
-    title(['建筑 ' num2str(i) ' 的负荷削减时序图']);
-    xlabel('时间 (半小时)');
-    ylabel('负荷需求 (kWh)');
-    legend({'净负荷', '有储能优化', '引入储能后的负荷削减'}, 'Location', 'best');
-end
-
-% 设置整个图形的标题
-sgtitle('所有建筑在各时间段的负荷削减时序图');
-hold off;
-
-
-% 计算每个时段的削减百分比
-reduction_percentage = zeros(m, T); % 初始化削减百分比矩阵
-for i = 1:m
-    for t = 1:T
-        if net_load_no_storage(i, t) > 0
-            reduction_percentage(i, t) = (net_load_no_storage(i, t) - net_load_with_storage(i, t)) / net_load_no_storage(i, t) * 100;
-        end
-    end
-end
-
-% 输出结果
-disp('无储能情况下的正净负荷：');
-disp(net_load_no_storage);
-disp('储能优化后的正净负荷：');
-disp(net_load_with_storage);
-disp('每个时段的负荷削减百分比：');
-disp(reduction_percentage);
-
-% Step 2: 计算每个建筑在峰值时段的削减百分比
-peak_reduction_percentage = zeros(m, 1); % 初始化峰值削减百分比向量
-for i = 1:m
-    % 找到每个建筑的净负荷峰值及其对应的时段
-    [peak_load, peak_time] = max(net_load_no_storage(i, :));
-    
-    % 计算储能优化后在峰值时段的削减百分比
-    if peak_load > 0
-        peak_reduction_percentage(i) = (peak_load - net_load_with_storage(i, peak_time)) / peak_load * 100;
-    else
-        peak_reduction_percentage(i) = 0; % 无峰值时，削减率设为0
-    end
-end
-
-% 输出结果
-disp('每个建筑的净负荷峰值削减百分比：');
-disp(peak_reduction_percentage);
+% % % % 绘制时序柱状图
+% % % figure;
+% % % hold on;
+% % % for i = 1:m
+% % %     % 每个建筑的负荷需求柱状图，按时间分布
+% % %     subplot(m, 1, i);
+% % %     
+% % %     % 绘制无储能和光伏时的负荷
+% % % %     bar(1:T, load_without_pv_storage(i, :), 'FaceColor', [0, 0.4470, 0.7410], 'EdgeColor', 'none'); 
+% % %     bar(1:T, net_load_no_storage(i, :), 'FaceColor', [0, 0.4470, 0.7410], 'EdgeColor', 'none'); 
+% % %     hold on;
+% % %     
+% % %     % 绘制优化后的负荷需求
+% % %     bar(1:T, load_with_pv_storage(i, :), 'FaceColor', [0.8500, 0.3250, 0.0980], 'EdgeColor', 'none');
+% % %     % 绘制储能优化后的净负荷曲线
+% % % %     plot(time, net_load_with_storage, '-', 'Color', [0, 0.45, 0.74], 'LineWidth', 1.5, 'MarkerSize', 5, 'DisplayName', '储能优化后净负荷');
+% % %     
+% % %     % 绘制负荷削减
+% % %     bar(1:T, load_reduction(i, :), 'FaceColor', [0.9290, 0.6940, 0.1250], 'EdgeColor', 'none', 'FaceAlpha', 0.5); 
+% % %     
+% % %     % 设置 x 轴的刻度和标签
+% % % xticks(1:2:48); % 每两个时间点（即每小时）显示一个刻度
+% % % xticklabels(0:24); % 显示为 24 小时制
+% % % 
+% % %     title(['建筑 ' num2str(i) ' 的负荷削减时序图']);
+% % %     xlabel('时间/h');%【还是改为24h】
+% % %     ylabel('与电网交互功率 (kW)');
+% % %     legend({'无储能无功率互济', '有储能有功率互济', '负荷削减'}, 'Location', 'best');
+% % % end
+% % % 
+% % % % 设置整个图形的标题
+% % % sgtitle('所有建筑在各时间段的负荷削减时序图');
+% % % hold off;
+% % % 
+% % % 
+% % % % 计算每个时段的削减百分比
+% % % reduction_percentage = zeros(m, T); % 初始化削减百分比矩阵
+% % % for i = 1:m
+% % %     for t = 1:T
+% % %         if net_load_no_storage(i, t) > 0
+% % %             reduction_percentage(i, t) = (net_load_no_storage(i, t) - load_with_pv_storage(i, t)) / net_load_no_storage(i, t) * 100;
+% % %         end
+% % %     end
+% % % end
+% % % 
+% % % % 输出结果
+% % % disp('无储能情况下的正净负荷：');
+% % % disp(net_load_no_storage);
+% % % disp('储能优化后的正净负荷：');
+% % % disp(net_load_with_storage);
+% % % disp('每个时段的负荷削减百分比：');
+% % % disp(reduction_percentage);
+% % % 
+% % % % Step 2: 计算每个建筑在峰值时段的削减百分比
+% % % peak_reduction_percentage = zeros(m, 1); % 初始化峰值削减百分比向量
+% % % for i = 1:m
+% % %     % 找到每个建筑的净负荷峰值及其对应的时段
+% % %     [peak_load, peak_time] = max(net_load_no_storage(i, :));
+% % %     
+% % %     % 计算储能优化后在峰值时段的削减百分比
+% % %     if peak_load > 0
+% % %         peak_reduction_percentage(i) = (peak_load - net_load_with_storage(i, peak_time)) / peak_load * 100;
+% % %     else
+% % %         peak_reduction_percentage(i) = 0; % 无峰值时，削减率设为0
+% % %     end
+% % % end
+% % % 
+% % % % 输出结果
+% % % disp('每个建筑的净负荷峰值削减百分比：');
+% % % disp(peak_reduction_percentage);
+%% 
+%----------------------------------------------------------------------------------------------------%
 
 
 % 示例数据（假设已计算并导入的数据）
@@ -375,12 +393,7 @@ disp(peak_reduction_percentage);
 % hold off;
 
 
-
-
-
-
-% 
-% % 设置经典的三种颜色
+% 设置经典的三种颜色
 % color_storage_discharge = [0, 0.4470, 0.7410]; % 蓝色
 % color_storage_charge = [0.8500, 0.3250, 0.0980]; % 橙色
 % color_grid_feed = [0.9290, 0.6940, 0.1250]; % 黄色

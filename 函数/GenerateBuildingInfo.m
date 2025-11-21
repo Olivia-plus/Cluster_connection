@@ -1,5 +1,5 @@
 % 随机生成建筑信息 保证建筑的类型固定，但是建筑的曲线的规模随机【二次验证的时候需要固定一下参数】
-function [x, y, type,load_curve,pv_curve,flexible_load,storage_capacity] = GenerateBuildingInfo(n)
+function [x, y, type,load_curve,pv_curve,flexible_load,storage_capacity] = GenerateBuildingInfo(n,storage_index)
     % 随机生成建筑位置
     x = rand(1, n) * 7000; % 假设建筑在 7000×7000 ㎡ 的面积里面随机分布，【TODO：范围改大一点】
     y = rand(1, n) * 7000;
@@ -90,7 +90,7 @@ commercial_pv_curve =[0,0,0,0,0,0,0,0,0,0,0,0,14.22036,24.767127,37.683954,53.08
     storage_capacity=zeros(1,n);
 % 根据建筑类型分配对应的曲线数据
   rng(2); % 设置随机种子以便结果可重复
-  storage_index=0.05;
+%  storage_index=0.00;  modified by DQJ  20241115
   flexible_index=0;
   for j = 1:n
         switch type{j}

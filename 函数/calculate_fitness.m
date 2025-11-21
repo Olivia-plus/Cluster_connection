@@ -1,10 +1,15 @@
-% 计算适应度和更新速度和位置的函数 【将net_load替换成了load_curve,pv_curve,便于计算柔性负荷最优调度】
+% 计算适应度和更新速度和位置的函数 【将net_load替换成了load_curve,pv_curve,便于计算柔性负荷最优调度】connect_cost_min
 % 涉及到两个函数，一个是柔性负荷的优化调度函数，传输最大功率矩阵；
 % 另外一个是线路传输的成本计算，涉及到最小生成树算法，树的权值为最大功率矩阵。目标是寻找到权值最小的生成树
-function [fitness,trade_power,bigMatrix,digest_main_rate,digest_extra_rate,digest_native_rate] = calculate_fitness(cluster_solution,load_curve,pv_curve, electricity_price,x,y,num_buildings,flexible_load_main,storage_capacity_main)
-    %等额本金参数
-    annualInterestRate = 2.5;    % 年利率百分比0 0.5 1 1.5 2 2.5 3 3.5 4 4.5 5
-    loanYears = 30;            % 还款年限10 20 30 40 50 
+% cost 是互联成本
+function [fitness,Cost,trade_power,bigMatrix,digest_main_rate,digest_extra_rate,digest_native_rate] = calculate_fitness(cluster_solution,load_curve,pv_curve, electricity_price,x,y,num_buildings,flexible_load_main,storage_capacity_main,annualInterestRate,ess_price)
+                                                                                                                       % (clusterIdx,load_curve,pv_curve,electricity_price,x,y,num_buildings,flexible_load_main,storage_capacity_main,annualInterestRate,PV_digest_without_storage,ess_price) 
+%等额本金参数
+    %annualInterestRate = 0.5;    % 年利率百分比0 0.5 1 1.5 2 2.5 3 3.5 4 4.5
+    %该参数放入函数的参数
+    
+    loanYears = 20;            % 还款年限10 20 30 40 50 
+
 %     fprintf('月还款金额为: %.2f 元\n', monthlyPayment);
 
     %% 处理集群的分类结果，得到每个集群的基本情况 传入[集群划分结果，净负荷，电价，直流线路铺设成本，坐标x,y,建筑的数量，柔性负荷，储能的容量]
@@ -46,6 +51,7 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
     fitness_prob=zeros(num_clusters,1);% 装每次集群计算后的数值
     min_cost=zeros(1,num_clusters);
     PV_digest=zeros(1,num_clusters);
+    PV_digest_without_storage=zeros(1,num_clusters);
     fitness_best_matrix=cell(1,num_clusters);
     best_trade_volume_total_prob=zeros(num_clusters,1);
     fitness_connect=inf;
@@ -73,7 +79,7 @@ relationshipMatrix = relationshipMatrix + eye(num_buildings);
                  load_curve_cluster_array=cell2mat(load_curve_cluster');
                  pv_curve_cluster_array=cell2mat(pv_curve_cluster');
         % 柔性负荷调度
-        [PV_digest(c),P]=FlexibleLoad(m,load_curve_cluster_array,pv_curve_cluster_array,flexible_load,storage_capacity);%【增加传出的最大交换功率矩阵,之后去掉柔性负荷和储能】
+        [PV_digest(c),P,PV_digest_without_storage(c)]=FlexibleLoad(m,load_curve_cluster_array,pv_curve_cluster_array,flexible_load,storage_capacity);%【增加传出的最大交换功率矩阵,之后去掉柔性负荷和储能】
         [T_matrix,min_cost(c)]=prim_connect_cost_min(P,m,x_cluster,y_cluster);%【x,y需要重新定义一下和处理】
 %         %% 循环遍历一个集群所有可能的连接情况【这里的m可能需要修改成为对应的集群中矩阵的尺寸,已修改】
 %         % 【TODO：最小生成树算法】
@@ -172,6 +178,9 @@ totalBuildings = 0;
 cluster_info(cellfun(@isempty,cluster_info))=[];
 fitness_best_matrix(cellfun(@isempty,fitness_best_matrix))=[];
 for i = 1:length(cluster_info)
+
+
+
     totalBuildings = max(totalBuildings, max(cluster_info{i}));
 end
 % 初始化大矩阵
@@ -199,6 +208,10 @@ bigMatrix = (bigMatrix + bigMatrix')/2;
 principal=3*sum(min_cost);
 monthlyPayment = calculateEqualMonthlyPayment(principal, annualInterestRate, loanYears);
     %% 适应度 收益减去成本 【结果成本有问题】
-    fitness =-(sum(PV_digest)*electricity_price-monthlyPayment/30);
+%    if(PV_digest_without_storage(1)==0)
+%        ess_price=0;
+%    end
+    fitness =-(sum(PV_digest)*electricity_price-(sum(PV_digest)-sum(PV_digest_without_storage))*ess_price-monthlyPayment/30);
+    Cost=monthlyPayment/30;
     trade_power=sum(PV_digest);
 end

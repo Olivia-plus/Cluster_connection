@@ -470,7 +470,7 @@ function [adjacency_matrix,min_cost]=connect_cost_min(P,n,x_cluster,y_cluster)
             remaining_edge = remaining_tree(1, :);
             original_edge_index = edge_index_map(1); % 通过映射找到原始索引
             P_max_onedge= max(abs(sum(node_values(remaining_edge(1,1),:,:),2)));
-            P_max_onedge=P_max_onedge*1000/(3*380*0.85);%将功率转换为孔径  
+            P_max_onedge=P_max_onedge*1000/(3*220);%将功率转换为孔径  
             L_price_one=P_max_onedge;
 %                 switch true%导线横截面积
 %                     case P_max_onedge>=M1

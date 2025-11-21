@@ -772,3 +772,8 @@ function visualizeClusters(X, C, clusterIdx, numClusters)
     ylabel('Y');
     hold off;
 end
+
+
+
+
+

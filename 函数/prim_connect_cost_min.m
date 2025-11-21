@@ -33,12 +33,12 @@ function [adjacency_matrix,min_cost]=prim_connect_cost_min(P,n,x_cluster,y_clust
     end
     
     % assign_weights(edges, edgeWeights, nodes);
-    edge_weights=assign_weights(n,edges,distMatrix,P);
+    [edge_weights,edge_weights_P]=assign_weights(n,edges,distMatrix,P);
     % 计算当前树的边权和
     edge_sum = sum(edge_weights);  % 计算边权和
     min_cost = edge_sum;
    
-    adjacency_matrix = tree_to_adjacency_matrix(edges, n);
+    adjacency_matrix = tree_to_adjacency_matrix(edges, n,edge_weights_P);
     % 可视化结果
 %     figure;
 %     hold on;
@@ -62,11 +62,12 @@ function [adjacency_matrix,min_cost]=prim_connect_cost_min(P,n,x_cluster,y_clust
         fprintf('%5d %5d %5d\n', edges(p, 1), edges(p, 2), edge_weights(p));
     end
     %% 边赋值的递归函数
-    function edge_weights=assign_weights(n,tree,distance_matrix,P)
+    function [edge_weights,edge_weights_P]=assign_weights(n,tree,distance_matrix,P)
         P_max=zeros(n,1);
         L_price=zeros(n,1);
         node_values=P; 
         edge_weights = zeros(size(tree, 1), 1); % 初始化边权值
+        edge_weights_P=zeros(size(tree, 1), 1); % 初始化边权值
         % 复制一份树的边关系
             remaining_tree = tree;  
          % 保存每条边在原始树中的索引
@@ -75,9 +76,10 @@ function [adjacency_matrix,min_cost]=prim_connect_cost_min(P,n,x_cluster,y_clust
                 remaining_edge = remaining_tree(1, :);
                 original_edge_index = edge_index_map(1); % 通过映射找到原始索引
                 P_max_onedge= max(abs(sum(node_values(remaining_edge(1,1),:,:),2)));
-                P_max_onedge=P_max_onedge*1000/(3*380*0.85);%将功率转换为孔径  
-                L_price_one=P_max_onedge;
+                P_max_onedge_hole=P_max_onedge*1000/(3*380*0.85);%将功率转换为孔径  
+                L_price_one=P_max_onedge_hole;
                 edge_weights(original_edge_index) =L_price_one*distance_matrix(remaining_edge(1,1), remaining_edge(1,2)); % 取两侧节点中较大的值
+                edge_weights_P(original_edge_index)=P_max_onedge;
             else
            % 逐层处理叶子节点
             while size(remaining_tree, 1) > 1
@@ -102,10 +104,10 @@ function [adjacency_matrix,min_cost]=prim_connect_cost_min(P,n,x_cluster,y_clust
                             % 给原始树中的对应边赋值，使用 edge_index_map 来找到原始索引
                             original_edge_index = edge_index_map(j); % 通过映射找到原始索引
                             P_max(leaf)= max(abs(sum(node_values(leaf,:,:),2)));
-                            P_max(leaf)=P_max(leaf)*1000/(3*380*0.85);%将功率转换为孔径
-                            L_price(leaf)=P_max(leaf);
+                            P_max_hole(leaf)=P_max(leaf)*1000/(3*380*0.85);%将功率转换为孔径
+                            L_price(leaf)=P_max_hole(leaf);
                             edge_weights(original_edge_index) =L_price(leaf)*distance_matrix(leaf, connected_node);
-                            
+                            edge_weights_P(original_edge_index)=P_max(leaf);
                             % 将叶子节点的值加到相连节点上
                             node_values(connected_node,:,:) = node_values(connected_node,:,:) + node_values(leaf,:,:);
                             
@@ -129,15 +131,16 @@ function [adjacency_matrix,min_cost]=prim_connect_cost_min(P,n,x_cluster,y_clust
                     remaining_edge = remaining_tree(1, :);
                     original_edge_index = edge_index_map(1); % 通过映射找到原始索引
                     P_max_last= max(abs(max(sum(node_values(remaining_edge(1,1),:,:),2))),max(abs(sum(node_values(remaining_edge(1,2),:,:),2))));
-                    P_max_last=P_max_last*1000/(3*380*0.85);
-                    L_price_last=P_max_last;
+                    P_max_last_hole=P_max_last*1000/(3*380*0.85);
+                    L_price_last=P_max_last_hole;
                     edge_weights(original_edge_index) =L_price_last*distance_matrix(remaining_edge(1,1), remaining_edge(1,2)); % 取两侧节点中较大的值
+                    edge_weights_P(original_edge_index)=P_max_last;
                 end
             end
     end
 
-    %% 辅助函数：将树的边结构转换为0-1邻接矩阵
-    function  adjacency_matrix = tree_to_adjacency_matrix(tree, n)
+    %% 辅助函数：将树的边结构转换为0-1(最大功率)邻接矩阵
+    function  adjacency_matrix = tree_to_adjacency_matrix(tree, n,edge_weights_P)
         % 初始化 n x n 的零矩阵
         adjacency_matrix = zeros(n, n);
         
@@ -145,8 +148,9 @@ function [adjacency_matrix,min_cost]=prim_connect_cost_min(P,n,x_cluster,y_clust
         for i = 1:size(tree, 1)
             node1 = tree(i, 1);
             node2 = tree(i, 2);
-            adjacency_matrix(node1, node2) = 1;
-            adjacency_matrix(node2, node1) = 1;  % 对称矩阵，保证无向图
+            weight=edge_weights_P(i);
+            adjacency_matrix(node1, node2) = weight;
+            adjacency_matrix(node2, node1) = weight;  % 对称矩阵，保证无向图
         end
     end
 
