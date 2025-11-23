@@ -823,4 +823,10 @@ grid on;
 axis equal;
 hold off;
 
+%%
+% 示例元胞数组
+C = {[1 2 3], [4 5 6], [7 8 9]};
+
+% 使用 cell2mat 转换为矩阵
+M = cell2mat(C');
 

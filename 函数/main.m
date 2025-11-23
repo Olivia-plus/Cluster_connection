@@ -1,0 +1,676 @@
+%**************************************************************************
+% 文件名: C:\Users\WuAoli\Desktop\毕设\集群规划算法代码\Cluster\main.m
+% 版本: v1.0
+% 作者: Wuaoli-123
+% 联系方式: 2713337051@qq.com
+% 日期: 2024-09-08
+% 描述:适应度函数由成本和收益两个指标构成。收益由集群整体构成的新增光伏消纳量决定，成本由线路铺设投资成本决定。在集群划分的过程中，将储能和可平移负荷的综合优化融合到目标函数最优化的求解中去。
+% 输入:
+% 输出:   
+%**************************************************************************
+
+%等额本金和等额本息
+%最小生成树prim算法 
+clear;
+clc;
+format short;% 默认精度
+tic
+%% 设定建筑的数量，地理坐标，以及建筑类型的分类
+% 设定建筑数量 20~100不等
+rng(1)
+num_buildings = 30;
+storage_index = 0.00;%storage_ratio
+ess_price=0.20;
+electricity_price=0.25;% 建筑交易收益电价0.25元/度，恒定不变
+annualInterestRate = 2.5;
+
+% 随机生成建筑基本信息
+[x, y, type, load_curve, pv_curve,flexible_load_main,storage_capacity_main] = GenerateBuildingInfo(num_buildings,storage_index);
+sum_values_PV= cellfun(@sum, pv_curve);
+sum_values_Load = cellfun(@sum, load_curve);
+% 绘制建筑位置分布图
+% 显示每个建筑的位置和类型, '行列转换符,列转行
+building_info= table((1:num_buildings)', x', y', type',storage_capacity_main',sum_values_PV', sum_values_Load','VariableNames', {'建筑编号', '横坐标', '纵坐标', '建筑类型', '储能容量','光伏总量','负荷总量'});
+disp('随机生成的建筑位置和类型：');
+disp(building_info);
+
+%%
+% 选择的索引
+selected_indices = [3, 5, 7, 27, 29]; 
+time = linspace(0, 24, 48); % 0 到 24 小时，48 个时间点
+
+% 经典 MATLAB 配色
+colors = lines(length(selected_indices));
+
+% 创建图形窗口
+figure;
+hold on;
+
+% 绘制 y=0 的横线（不在图例中）
+yline(0, '--k', 'LineWidth', 1.5, 'HandleVisibility', 'off'); 
+
+for i = 1:length(selected_indices)
+    idx = selected_indices(i);
+    net_load = load_curve{idx} - pv_curve{idx}; % 计算净负荷
+    plot(time, net_load, 'LineWidth', 2, 'Color', colors(i,:), 'DisplayName', ['第 ' num2str(idx) ' 组']);
+end
+
+% 设置轴标签和标题
+xlabel('时间 (小时)');
+ylabel('净负荷 (kW)');
+title('不同时段的净负荷曲线');
+
+% 设置 x 轴范围和刻度
+xlim([0, 24]); % 确保横坐标范围
+xticks(0:4:24); % 强制显示 0, 4, 8, 12, 16, 20, 24
+xticklabels({'00:00','04:00','08:00','12:00','16:00','20:00','24:00'}); % 设置刻度标签
+% 使用 MATLAB 默认配色方案
+colororder(lines); 
+
+% 显示图例
+legend show;
+
+% 开启网格
+% grid on;
+hold off;
+
+
+%% 根据光伏、负荷和储能值得相对大小绘图
+% 
+% categories = unique(type); % 获取所有不同的建筑类型
+% num_categories = numel(categories);
+% colors = lines(num_categories); % 生成不同建筑类型的颜色
+% 
+% % 设置点大小的缩放比例（根据数据大小调整）
+% pv_scale = 450/max(sum_values_PV); % 归一化缩放光伏点大小
+% load_scale = 450/max(sum_values_Load); % 归一化缩放负荷点大小
+% storage_scale = 450/max(storage_capacity_main); % 归一化缩放储能点大小
+% 
+% % 1. 绘制光伏总量图
+% figure;
+% hold on;
+% for i = 1:num_categories
+%     idx = strcmp(type, categories{i});
+%     scatter(x(idx), y(idx), sum_values_PV(idx) * pv_scale, colors(i, :), 'filled');
+% end
+% % 在每个点正上方显示建筑编号
+% for i = 1:num_buildings
+%     text(x(i), y(i) + 3.5, sprintf('%d', i), 'VerticalAlignment', 'bottom', ...
+%         'HorizontalAlignment', 'center', 'FontSize', 10, 'FontWeight', 'bold');
+% end
+% title('建筑日光伏总量分布');
+% xlabel('X坐标/m');
+% ylabel('Y坐标/m');
+% legend(categories, 'Location', 'best');
+% hold off;
+% 
+% % 2. 绘制负荷总量图
+% figure;
+% hold on;
+% for i = 1:num_categories
+%     idx = strcmp(type, categories{i});
+%     scatter(x(idx), y(idx), sum_values_Load(idx) * load_scale, colors(i, :), 'filled');
+% end
+% % 在每个点正上方显示建筑编号
+% for i = 1:num_buildings
+%     text(x(i), y(i) + 3.5, sprintf('%d', i), 'VerticalAlignment', 'bottom', ...
+%         'HorizontalAlignment', 'center', 'FontSize', 10, 'FontWeight', 'bold');
+% end
+% title('建筑日负荷总量分布');
+% xlabel('X坐标/m');
+% ylabel('Y坐标/m');
+% legend(categories, 'Location', 'best');
+% hold off;
+% 
+% % 3. 绘制储能容量分布图
+% figure;
+% hold on;
+% for i = 1:num_categories
+%     idx = strcmp(type, categories{i});
+%     scatter(x(idx), y(idx), storage_capacity_main(idx) * storage_scale, colors(i, :), 'filled');
+% end
+% % 在每个点正上方显示建筑编号
+% for i = 1:num_buildings
+%     text(x(i), y(i) + 3.5, sprintf('%d', i), 'VerticalAlignment', 'bottom', ...
+%         'HorizontalAlignment', 'center', 'FontSize', 10, 'FontWeight', 'bold');
+% end
+% title('建筑储能容量分布');
+% xlabel('X坐标/m');
+% ylabel('Y坐标/m');
+% legend(categories, 'Location', 'best');
+% hold off;
+
+% 绘制每个建筑的负荷曲线和光伏曲线以及净负荷图【最后再取消注释，这一步其实也不是很有必要，但是也写着】
+% 循环绘制每个建筑的曲线图
+% figure;
+% index_array=[16,11,3,24,2];
+% for i = index_array
+%     % 绘制第i个建筑的曲线图
+%     figure;
+%     PlotBuildingCurves(load_curve{i}, pv_curve{i});
+%     hold on
+% end
+% % 添加标题
+% title('20个建筑曲线图');
+% %% 绘制负荷变化三维图【不是很重要】
+% %  净负荷元胞
+% hours_per_day = 48;
+% % 创建一个空的元胞数组来存储净负荷曲线
+% net_load_curve = cell(1, num_buildings);
+% % 净负荷       
+% for i = 1:num_buildings
+%     net_load_curve{i} = load_curve{i} - pv_curve{i};
+% end
+% % 创建时间轴标签，感觉没起到作用！！！【为啥捏？】
+% time_labels = cell(1, hours_per_day);
+% for i = 1:hours_per_day
+%     hour = floor((i-1)/2);
+%     minute = rem(i-1, 2) * 30;
+%     time_labels{i} = sprintf('%02d:%02d', hour, minute);
+% end
+% % 创建小时和建筑索引网格
+% [hour, building] = meshgrid(1:hours_per_day, 1:num_buildings);
+% 
+% % 将每个建筑的负荷数据放在网格中的对应位置
+% load_grid = zeros(num_buildings, hours_per_day);
+% for i = 1:num_buildings
+%     load_grid(i, :) = net_load_curve{i};
+% end
+% 
+% % 绘制三维图
+% figure;
+% surf(building, hour, load_grid);
+% xlabel('建筑编号');
+% ylabel('时间');
+% % zlabel('负荷/MW');
+% % zlabel('光伏/MW');
+% zlabel('净负荷/MW');
+% % title('所有建筑节点的日负荷数据');
+% % title('所有建筑节点的日光伏出力数据');
+% title('所有建筑节点的日净负荷数据');
+% colorbar; % 添加颜色条
+%                                            
+% grid on
+
+% kmeans算法，将100个粒子按照不同的种群的数量（随机给）进行聚类。
+% 然后每个粒子按照给定的速度和方向去扩张和缩减自己所属种群的大小，但是仍旧保证集群之间不存在交叉重叠的情况。
+
+%% 根据提供的数据编写粒子群算法的集群划分代码
+% 基本参数设置
+max_iter = 20; % 最大迭代次6数
+pop_size = 40; % 种群规模
+dim=num_buildings; % 粒子维度
+% numClusters = 5;         % 集群数量
+
+w = 0.5; % 惯性权重
+c1 = 1.5; % 学习因子 1
+c2 = 1.5; % 学习因子 2        
+velocityLimit=900;% 粒子速度限制
+coord=[x',y'];% 坐标
+
+%     net_load{num_buildings}=0;
+%     for i = 1:num_buildings
+%     net_load{i} = load_curve{i} - pv_curve{i};% 净负荷曲线
+%     end
+
+% % 显示初始点分布
+% figure(100);
+% scatter(coord(:,1), coord(:,2), 'filled');
+% title('建筑分布');
+% xlabel('X坐标/m');
+% ylabel('Y坐标/m');
+% hold on;
+
+figure(100);
+hold on;
+categories = unique(type); % 获取所有不同的建筑类型
+num_categories = numel(categories);
+colors = lines(num_categories); % 生成对应数量的颜色
+
+for i = 1:num_categories
+    idx = strcmp(type, categories{i}); % 找到属于当前类别的建筑
+    scatter(x(idx), y(idx), 50, colors(i, :), 'filled'); % 绘制散点
+end
+
+% 在每个点正上方显示建筑编号
+for i = 1:num_buildings
+    text(x(i), y(i) + 0.5, sprintf('%d', i), 'VerticalAlignment', 'bottom', ...
+        'HorizontalAlignment', 'center', 'FontSize', 12, 'FontWeight', 'bold');
+end
+
+title('建筑分布', 'FontSize', 14);
+xlabel('X坐标/m');
+ylabel('Y坐标/m');
+legend(categories, 'Location', 'best','FontSize', 12); % 添加图例
+hold off;
+
+% 初始化粒子群
+particles = cell(pop_size, 1);  % 每个粒子表示不同的质心集
+velocities = cell(pop_size, 1); % 每个粒子的速度
+
+% max_numClusters=floor(num_buildings/2);
+max_numClusters=9;
+
+gbest_fitness_allcase=zeros(max_numClusters,1);
+trade_allcase=zeros(max_numClusters,1);
+gbest_digest_extra_rate_allcase=zeros(max_numClusters,1);
+gbest_digest_native_rate_allcase=zeros(max_numClusters,1);
+gbest_digest_main_rate_allcase=zeros(max_numClusters,1);
+connectMatrix=cell(1,max_numClusters);
+
+% numClusters=1;
+for numClusters=9:max_numClusters
+        for i = 1:pop_size
+            particles{i} = coord(randperm(num_buildings, numClusters), :);  % 随机选择质心
+            velocities{i} = randn(numClusters, 2) * velocityLimit;  % 初始化速度
+        end
+        
+        % 初始化每个历史最优粒子
+        pbest_fitness = Inf(pop_size, 1); 
+        pbest = particles; 
+        gbest_fitness=Inf;
+        gbest=particles{1};
+        
+        % 记录适应度变化
+        fitnessHistory = zeros(max_iter, 1);  % 适应度变化记录
+        costHistory = zeros(max_iter, 1);  % 适应度变化记录
+
+        trade=0;
+        Convergence_curve=zeros(max_iter,1); % 收敛曲线
+        trade_curve=zeros(max_iter,1); % 交易曲线
+        best_connectMatrix=zeros(num_buildings,num_buildings);% 最佳连接矩阵
+        
+                fitness_valuse_personal=zeros(pop_size,1);
+                cost_valuse_personal=zeros(pop_size,1);
+                PerPayment_valuse_personal=zeros(pop_size,1);
+                trade_power=zeros(pop_size,1);
+                bigMatrix=cell(1,pop_size);
+                digest_main_rate_personal=zeros(pop_size,1);
+                digest_extra_rate_personal=zeros(pop_size,1);
+                digest_native_rate_personal=zeros(pop_size,1);
+                pbest_digest_main_rate_personal=zeros(pop_size,1);
+                pbest_digest_extra_rate_personal=zeros(pop_size,1);
+                pbest_digest_native_rate_personal=zeros(pop_size,1);
+                % 迭代开始
+                for iter = 1:max_iter 
+                    % 对所有的粒子遍历
+                    for j = 1:pop_size
+                        % 获取当前粒子的质心
+                        C = particles{j};
+                        % 计算每个点到质心的距离
+                        distances = pdist2(coord, C);
+                        [~, clusterIdx] = min(distances, [], 2);  % 将每个点分配到最近的质心
+                        % 检查集群是否满足要求：没有孤立节点，集群不重叠
+                        valid = checkClusterValidity(coord, clusterIdx, numClusters);
+                        % 计算适应度
+                        if valid
+                            %[fitness_valuse_personal(j),trade_power(j),bigMatrix{j},digest_main_rate_personal(j),digest_extra_rate_personal(j),digest_native_rate_personal(j)]= calculate_fitness(clusterIdx,load_curve,pv_curve,electricity_price,x,y,num_buildings,flexible_load_main,storage_capacity_main,annualInterestRate); % 【将net_load替换成了load_curve,pv_curve,便于计算柔性负荷最优调度】
+                            %calculate trade_power without storage
+                               if(storage_index == 0)
+                                  [fitness_valuse_personal(j),cost_valuse_personal(j),trade_power(j),bigMatrix{j},digest_main_rate_personal(j),digest_extra_rate_personal(j),digest_native_rate_personal(j)]= calculate_fitness(clusterIdx,load_curve,pv_curve,electricity_price,x,y,num_buildings,flexible_load_main,storage_capacity_main,annualInterestRate,0); % 【将net_load替换成了load_curve,pv_curve,便于计算柔性负荷最优调度】
+                               else 
+                                  if(storage_index>0)
+                                  [fitness_valuse_personal(j),cost_valuse_personal(j),trade_power(j),bigMatrix{j},digest_main_rate_personal(j),digest_extra_rate_personal(j),digest_native_rate_personal(j)]= calculate_fitness(clusterIdx,load_curve,pv_curve,electricity_price,x,y,num_buildings,flexible_load_main,storage_capacity_main,annualInterestRate,ess_price); % 【将net_load替换成了load_curve,pv_curve,便于计算柔性负荷最优调度】
+                                  end
+                               end
+                        else
+                            fitness_valuse_personal(j) = inf;  % 不合法的集群划分给予惩罚
+                        end
+        
+                        % 更新个体最优
+                        if fitness_valuse_personal(j) < pbest_fitness(j)
+                            pbest{j}= particles{j};
+                            pbest_fitness(j) = fitness_valuse_personal(j);
+                            pbest_cost(j)=cost_valuse_personal(j);
+                            pbest_digest_main_rate_personal(j)=digest_main_rate_personal(j);
+                            pbest_digest_extra_rate_personal(j)=digest_extra_rate_personal(j);
+                            pbest_digest_native_rate_personal(j)=digest_native_rate_personal(j);
+                        end
+        
+                        % 更新全局最优
+                        if pbest_fitness(j) < gbest_fitness% 粒子和全局最优解对比
+                            gbest = particles{j};
+                            gbest_fitness = fitness_valuse_personal(j);
+                            gbest_cost=cost_valuse_personal(j);
+                            trade=trade_power(j);
+                            best_connectMatrix=bigMatrix{j};
+                            gbest_digest_main_rate=pbest_digest_main_rate_personal(j);
+                            gbest_digest_extra_rate=pbest_digest_extra_rate_personal(j);
+                            gbest_digest_native_rate=pbest_digest_native_rate_personal(j);
+                        end
+                    end
+        
+                    % 记录当前迭代的适应度
+                    fitnessHistory(iter) = gbest_fitness;
+                    costHistory(iter)=cost_valuse_personal(j);
+                
+                    % 更新质心位置
+                    for p = 1:pop_size
+                        velocities{p} = w * velocities{p} ...
+                            + c1 * rand * (pbest{p} - particles{p}) ...
+                            + c2 * rand * (gbest - particles{p});  % 粒子速度更新
+                        particles{p} = particles{p} + velocities{p};  % 更新粒子质心位置
+                    end
+        
+%                     % 可视化第一个粒子的集群划分
+%                     figure;
+%                     subplot(1, 2, 1);
+%                     visualizeClusters(coord, particles{1}, clusterIdx, numClusters);
+%                     title([' 划分 ',num2str(numClusters),' 个集群时第一个粒子的集群划分 (迭代: ', num2str(iter), ')']);
+%         
+%                     % 可视化当前最优集群划分（每隔10次迭代）
+%                     subplot(1, 2, 2);
+%                     visualizeClusters(coord, gbest, clusterIdx, numClusters);
+%                     title(['全局最优集群划分 (迭代: ', num2str(iter), ')']);
+        
+                    pause(0.5);
+        
+                    % 检查是否达到收敛条件
+%                     if gbest_fitness < 1e-5
+                    if (iter>1 && fitnessHistory(iter)-fitnessHistory(iter-1) < 1e-5)
+                        break;
+                    end
+                end
+        
+                % 显示最终集群划分结果
+                figure(100+numClusters);clf;
+                %%
+                visualizeClusters(coord, gbest, clusterIdx, numClusters);
+                % visualizeClusters2(coord, gbest, clusterIdx, numClusters, type);
+                title('最终最优集群划分');
+                %%
+                % 绘制适应度变化图
+                figure(numClusters);clf;
+                plot(fitnessHistory(1:max_iter), 'LineWidth', 2);
+                title('适应度变化图');
+                xlabel('迭代次数');
+                ylabel('适应度');
+                grid on;
+               
+                gbest_fitness_allcase(numClusters)=gbest_fitness;
+                gbest_cost_allcase(numClusters)=gbest_cost;
+
+%                 [min_value, min_index] = min(gbest_fitness_allcase); % 找到最小值和对应的索引
+%                 corresponding_cost = gbest_cost_allcase(min_index); % 用索引查找对应的 gbest_cost_allcase 值
+
+                trade_allcase(numClusters)=trade;
+                connectMatrix{numClusters}=best_connectMatrix;
+                gbest_digest_extra_rate_allcase(numClusters)=gbest_digest_extra_rate;
+                gbest_digest_native_rate_allcase(numClusters)=gbest_digest_native_rate;
+                gbest_digest_main_rate_allcase(numClusters)=gbest_digest_main_rate;
+end
+%%
+                for numClusters=4:max_numClusters
+                [minValue,idx]=min(gbest_fitness_allcase);
+                fileID = fopen('output.txt', 'a'); % 'wt'表示文本写入模式
+                %
+                txt=[datestr(now,'yyyymmddTHHMMSS'),'   storage_index=' num2str(storage_index),'  annualInterestRate=' num2str(annualInterestRate), '   最优集群划分数量为 = ' num2str(numClusters) '个 ',' 集群最优适应度为 = '  num2str(-gbest_fitness_allcase(numClusters))  '元， 集群总成本 = ' num2str(gbest_cost_allcase(numClusters)) '元，集群光伏总消纳量为 = ' num2str(trade_allcase(numClusters)) 'kWh','光伏的总消纳率为=' num2str(gbest_digest_main_rate_allcase(numClusters)*100) '%;''光伏的额外消纳率为=' num2str(gbest_digest_extra_rate_allcase(numClusters)*100) '%;''光伏的本地自消纳率为=' num2str(gbest_digest_native_rate_allcase(numClusters)*100) '% ' newline];
+                fprintf(fileID, '%c ', txt );
+                disp(txt);
+                % 绘制连通图
+%                 plotBuildingConnections(coords, connect_Matrix, type);
+                plotBuildingConnections(coord, connectMatrix{numClusters}, type,numClusters);
+                end
+                %%
+                %disp(['集群最优适应度为 = '  num2str(-min(gbest_fitness_allcase))  '元， '' 集群光伏总消纳量为 = ' num2str(trade_allcase(idx)) 'kWh',' 最优集群划分数量为 = ' num2str(idx) '个',newline,'光伏的总消纳率为=' num2str(gbest_digest_main_rate*100) '%;''光伏的额外消纳率为=' num2str(gbest_digest_extra_rate*100) '%;''光伏的本地自消纳率为=' num2str(gbest_digest_native_rate*100) '%']);
+
+%         %% 绘制建筑互联图
+% %         connect_Matrix = connectMatrix{numClusters}; 
+%         connect_Matrix=best_connectMatrix;
+%         coords=coord;
+%         num_buildings = size(coords, 1); % 建筑数量
+%         
+%         % 获取连通组件（建筑群体）
+%         G = graph(connect_Matrix); % 将连接矩阵转为图
+%         [bin, binsizes] = conncomp(G); % bin表示每个节点所属的连通分量，binsizes表示每个分量的大小
+%         
+%         % 获取颜色
+%         unique_bins = unique(bin);
+%         num_clusters = length(unique_bins); % 连通子图数量
+%         colors = lines(num_clusters); % 使用不同颜色表示不同的连通子图
+%         
+%         % 设置线条样式
+%         lineColor_other = [0.5, 0.5, 0.5]; % 灰色，用于不同连通分量之间的线
+%         lineWidth = 2; % 线宽
+%         markerSize = 8; % 标记大小
+%         
+%         % 绘制建筑位置
+%         figure(200+numClusters);clf;
+%         hold on;
+%         
+%         % 绘制所有建筑的节点
+%         plot(coords(:,1), coords(:,2), 'o', 'MarkerEdgeColor', 'k', 'MarkerFaceColor', 'w', 'MarkerSize', markerSize, 'LineWidth', 1.5);
+%         text(coords(:,1), coords(:,2), num2str((1:num_buildings)'), 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'right', 'FontSize', 8);
+%         
+%         % 绘制连通的树枝和节点圈
+%         for k = 1:num_clusters
+%             % 获取属于当前连通分量的建筑索引
+%             cluster_nodes = find(bin == unique_bins(k));
+%             
+%             % 如果连通分量内的建筑数量大于2，画圈圈出这些节点
+%             if length(cluster_nodes) > 2
+%                 cluster_coords = coords(cluster_nodes, :);
+%                 hull = convhull(cluster_coords(:,1), cluster_coords(:,2)); % 获取凸包
+%                 fill(cluster_coords(hull,1), cluster_coords(hull,2), colors(k,:), 'FaceAlpha', 0.1, 'EdgeColor', 'none'); % 轻微填充
+%             elseif length(cluster_nodes) == 2
+%                 % 当群体只有两个节点时，用矩形圈住
+%                 cluster_coords = coords(cluster_nodes, :);
+%                 rectangle('Position', [min(cluster_coords(:,1)) min(cluster_coords(:,2)) ...
+%                     abs(diff(cluster_coords(:,1))) abs(diff(cluster_coords(:,2)))], ...
+%                     'EdgeColor', colors(k,:), 'LineWidth', 1.5, 'LineStyle', '--');
+%             end
+%             
+%             % 为当前群体绘制线（包括仅两个节点的群体）
+%             for i = 1:length(cluster_nodes)
+%                 for j = i+1:length(cluster_nodes)
+%                     node1 = cluster_nodes(i);
+%                     node2 = cluster_nodes(j);
+%                     if connect_Matrix(node1, node2) == 1
+%                         % 绘制建筑 node1 和 node2 之间的连线，使用特定颜色
+%                         plot([coords(node1,1) coords(node2,1)], [coords(node1,2) coords(node2,2)], '-', 'Color', colors(k,:), 'LineWidth', lineWidth);
+%                     endcorresponding_cost
+%                 end
+%             end
+%         end
+%         
+%         % 绘制其他未连通的建筑之间的线
+%         [n, m] = size(connect_Matrix);
+%         for i = 1:n
+%             for j = i+1:m
+%                 if connect_Matrix(i,j) == 1 && bin(i) ~= bin(j)
+%                     % 绘制不同连通分量间的连线，使用灰色
+%                     plot([coords(i,1) coords(j,1)], [coords(i,2) coords(j,2)], '--', 'Color', lineColor_other, 'LineWidth', lineWidth);
+%                 end
+%             end
+%         end
+%         
+%         hold off;
+% 
+% % 设置图形属性
+% xlabel('X坐标/m');
+% ylabel('Y坐标/m');
+% % title('建筑及其连接关系');
+% grid on;
+% axis equal;
+% hold off;
+
+%% 辅助函数：检查集群有效性
+function valid = checkClusterValidity(X, clusterIdx, numClusters)
+    for i = 1:numClusters
+        if sum(clusterIdx == i) < 2
+            valid = false;
+            return;
+        end
+    end
+    
+    clusterCenters = zeros(numClusters, 2);
+    for i = 1:numClusters
+        clusterCenters(i, :) = mean(X(clusterIdx == i, :), 1);
+    end
+    
+    if min(pdist(clusterCenters)) < 50
+        valid = false;
+        return;
+    end
+    valid = true;
+end
+
+%% 辅助函数：可视化集群划分
+function visualizeClusters(X, C, clusterIdx, numClusters)
+    colors = lines(numClusters);  % 使用不同的颜色标识不同集群
+    hold on;
+    
+    for i = 1:numClusters
+        clusterPoints = X(clusterIdx == i, :);  % 选出属于第 i 个集群的点
+        scatter(clusterPoints(:, 1), clusterPoints(:, 2), 50, colors(i, :), 'filled');
+        
+        % 画出集群的边界（凸包）
+        if size(clusterPoints, 1) > 2
+            k = convhull(clusterPoints(:, 1), clusterPoints(:, 2));
+            plot(clusterPoints(k, 1), clusterPoints(k, 2), 'Color', colors(i, :), 'LineWidth', 2);
+        end
+        
+        scatter(C(i, 1), C(i, 2), 100, 'x', 'LineWidth', 2, 'MarkerEdgeColor', colors(i, :));  % 质心
+    end
+    
+    title('集群划分结果');
+    xlabel('X');
+    ylabel('Y');
+    hold off;
+end
+
+function visualizeClusters2(X, C, clusterIdx, numClusters, type)
+    figure;
+    hold on;
+    categories = unique(type);  % 获取所有不同的建筑类型
+    num_categories = numel(categories);
+    colors = lines(num_categories);  % 生成不同的颜色
+    
+    % 绘制每个点，并根据类型着色
+    for i = 1:num_categories
+        idx = strcmp(type, categories{i});  % 找到属于当前类别的建筑
+        scatter(X(idx, 1), X(idx, 2), 100, colors(i, :), 'filled');  % 绘制建筑点
+    end
+    
+    % 画出集群边界
+    cluster_colors = lines(numClusters);  % 生成不同的集群颜色
+    for i = 1:numClusters
+        clusterPoints = X(clusterIdx == i, :);  % 选出属于第 i 个集群的点
+        
+        % 画凸包边界
+        if size(clusterPoints, 1) > 2
+            k = convhull(clusterPoints(:, 1), clusterPoints(:, 2));
+            plot(clusterPoints(k, 1), clusterPoints(k, 2), 'Color', cluster_colors(i, :), 'LineWidth', 2);
+        end
+        
+        % 绘制集群质心
+        scatter(C(i, 1), C(i, 2), 100, 'x', 'LineWidth', 2, 'MarkerEdgeColor', cluster_colors(i, :));
+    end
+    
+    % 在每个点上方标注编号
+    for i = 1:size(X, 1)
+        text(X(i, 1), X(i, 2) + 0.5, sprintf('%d', i), 'VerticalAlignment', 'bottom', ...
+            'HorizontalAlignment', 'center', 'FontSize', 12, 'FontWeight', 'bold');
+    end
+    
+    title('建筑集群划分与类型分布');
+    xlabel('X 坐标/m');
+    ylabel('Y 坐标/m');
+    legend(categories, 'Location', 'best', 'FontSize', 12);  % 添加图例
+    hold off;
+end
+
+function plotBuildingConnections(coords, connect_Matrix, type,numClusters)
+    num_buildings = size(coords, 1); % 建筑数量
+
+    % 计算连通组件（集群）
+    G = graph(connect_Matrix);
+    [bin, binsizes] = conncomp(G); % bin 表示每个建筑所属的连通分量
+    unique_bins = unique(bin);
+    num_clusters = length(unique_bins); % 计算集群数量
+    cluster_colors = lines(num_clusters); % 生成不同集群的颜色
+
+    % 建筑类型颜色
+    categories = unique(type); % 获取建筑类型
+    num_categories = numel(categories);
+    type_colors = lines(num_categories); % 生成类型颜色
+    
+    % 设置连线样式
+    lineColor_other = [0.5, 0.5, 0.5]; % 灰色表示不同集群之间的连线
+    lineWidth = 2; % 线宽
+    markerSize = 8; % 建筑点大小
+
+    % 创建图形
+    figure;
+    hold on;
+    
+    % 1. 绘制建筑点（按类型上色）
+    for i = 1:num_categories
+        idx = strcmp(type, categories{i}); % 找到当前类别的建筑
+%         scatter(coords(idx,1), coords(idx,2), markerSize * 5, type_colors(i, :), 'filled'); % 按类型着色
+%          scatter(coords(idx,1), coords(idx,2), 100, type_colors(i,:), 'filled', 'MarkerEdgeColor', 'k', 'LineWidth', 2); % 300 = 更大点
+scatter(coords(idx,1), coords(idx,2), 100, type_colors(i,:), 'filled'); % 300 = 更大点
+    end
+    
+    % 2. 画连通集群的边界
+    for k = 1:num_clusters
+        cluster_nodes = find(bin == unique_bins(k)); % 找到属于当前集群的建筑
+        cluster_coords = coords(cluster_nodes, :); % 获取该集群的坐标
+        
+%         % 绘制凸包边界
+%         if size(cluster_coords, 1) > 2
+%             hull = convhull(cluster_coords(:,1), cluster_coords(:,2)); % 获取凸包
+%             fill(cluster_coords(hull,1), cluster_coords(hull,2), cluster_colors(k, :), 'FaceAlpha', 0.1, 'EdgeColor', 'none'); % 半透明填充
+%         elseif length(cluster_nodes) == 2
+%             % 两个建筑的集群用虚线矩形圈住
+%             rectangle('Position', [min(cluster_coords(:,1)), min(cluster_coords(:,2)), ...
+%                 abs(diff(cluster_coords(:,1))), abs(diff(cluster_coords(:,2)))], ...
+%                 'EdgeColor', cluster_colors(k, :), 'LineWidth', 1.5, 'LineStyle', '--');
+%         end
+    end
+    
+    % 3. 绘制集群内部的连接线
+    for k = 1:num_clusters
+        cluster_nodes = find(bin == unique_bins(k));
+        for i = 1:length(cluster_nodes)
+            for j = i+1:length(cluster_nodes)
+                node1 = cluster_nodes(i);
+                node2 = cluster_nodes(j);
+                if connect_Matrix(node1, node2) ~= 0
+                    plot([coords(node1,1), coords(node2,1)], [coords(node1,2), coords(node2,2)], '-', ...
+                        'Color', cluster_colors(k, :), 'LineWidth', lineWidth);
+                end
+            end
+        end
+    end
+
+    % 4. 绘制不同集群之间的连线（灰色）
+    [n, m] = size(connect_Matrix);
+    for i = 1:n
+        for j = i+1:m
+            if connect_Matrix(i,j) ~= 0 && bin(i) ~= bin(j)
+                plot([coords(i,1), coords(j,1)], [coords(i,2), coords(j,2)], '--', ...
+                    'Color', lineColor_other, 'LineWidth', lineWidth);
+            end
+        end
+    end
+
+    % 5. 在每个建筑上方标注编号
+    for i = 1:num_buildings
+        text(coords(i,1), coords(i,2) + 0.5, num2str(i), 'VerticalAlignment', 'bottom', ...
+            'HorizontalAlignment', 'center', 'FontSize', 10, 'FontWeight', 'bold');
+    end
+% 设置横纵坐标范围
+xlim([-500 7500]);
+ylim([-500 7500]);
+
+    % 6. 设置图形属性
+    xlabel('X 坐标/m');
+    ylabel('Y 坐标/m');
+    title(sprintf('给定集群数为 %d 的最优划分结果', numClusters));
+    legend(categories, 'Location', 'best', 'FontSize',10); % 添加图例
+%     grid on;
+    axis equal;
+    hold off;
+end
+
