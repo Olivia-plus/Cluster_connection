@@ -20,7 +20,7 @@ tic
 rng(1)
 num_buildings = 30;
 storage_index = 0.00;%storage_ratio
-ess_price=0.20;%储能的度电成本 遗憾的是没有考虑储能的建设成本和运行维护成本
+ess_price=0.20;%储能的度电成本 遗憾的是没有考虑
 electricity_price=0.25;% 建筑交易收益电价0.25元/度，恒定不变
 annualInterestRate = 2.5;
 
